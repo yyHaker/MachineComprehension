@@ -1,0 +1,53 @@
+{
+    "name": "MC",
+    "n_gpu": 1,
+     "data_loader": {
+        "type": "DuReader",
+        "args":{
+            "data_path": "data/dureader/raw",
+            "train_file": "zhidao.train.json",
+            "dev_file": "zhidao.dev.json",
+            "train_batch_size": 64,
+            "dev_batch_size": 16,
+            "context_threshold": 500,
+            "pretrain_emd_file": "glove.6B.100d.txt",
+            "device": "cuda"
+        }
+    },
+    "arch": {
+        "type": "BiDAF",
+        "args": {
+            "char_dim": 8,
+            "char_channel_width": 5,
+            "char_channel_size": 100,
+            "word_dim": 100,
+            "context_threshold": 400,
+            "hidden_size": 100,
+            "dropout": 0.2
+        }
+    },
+    "optimizer": {
+        "type": "Adadelta",
+        "args":{
+            "lr": 0.5,
+            "weight_decay": 1e-4
+        }
+    },
+    "loss": {
+        "type":"cross_entropy"
+    },
+    "metrics": "ACC",
+    "trainer": {
+        "epochs": 50,
+        "save_dir": "./result/dureader/saved/",
+        "save_freq": 10,
+        "verbosity": 2,
+        "monitor": "f1",
+        "monitor_mode": "max",
+        "dataset_file": "data/dureader/raw/zhidao.dev-v1.1.json",
+        "prediction_file": "./result/predict/prediction.out"
+    },
+    "visualization": {
+        "log_dir": "./result/visual/"
+    }
+}

@@ -11,13 +11,18 @@ import json
 import os
 import spacy
 import codecs
-
+import nltk
+import jieba
 
 spacy_en = spacy.load('en')
 
 
 def tokenizer(text):
     return [tok.text for tok in spacy_en.tokenizer(text.strip())]
+
+
+def CN_tokenizer(text):
+    return jieba.cut(text)
 
 
 def dumpObj(obj, file):
@@ -68,5 +73,6 @@ def ensure_dir(path):
 if __name__ == "__main__":
     text = "I like playing computer games."
     sent = "I want to watch tv in living room"
-    print(tokenizer(text))
+    text2 = "网站赌博输钱报警有吗"
+    print(word_tokenize(text2))
     print(tokenizer(sent))

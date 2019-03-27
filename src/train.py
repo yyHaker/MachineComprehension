@@ -15,7 +15,7 @@ import os
 import torch
 from utils import Logger
 
-import data_loader.squad as module_data
+import data_loader.dureader as module_data
 import model.bidaf as module_arch
 import loss.loss as module_loss
 import metric.metric as module_metric
@@ -69,7 +69,7 @@ def main(config, resume):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='PyTorch MC')
-    parser.add_argument('-c', '--config', default="config.json", type=str,
+    parser.add_argument('-c', '--config', default="du_config.json", type=str,
                         help='config file path (default: None)')
     parser.add_argument('-r', '--resume', default=None, type=str,
                         help='path to latest checkpoint (default: None)')
