@@ -41,21 +41,21 @@ class DuReader(object):
         self.WORD = data.Field(sequential=True, use_vocab=True, batch_first=True,
                                tokenize=lambda x: x, lower=True, include_lengths=True)
         self.LABEL = data.Field(sequential=False, use_vocab=False, unk_token=None)
-        # self.q_LABEL = data.Field(sequential=False, use_vocab=True, unk_token=None)  # 可在预处理的时候做
 
         dict_fields = {'question_id': ('id', self.RAW),
                        'question': [('q_word', self.WORD), ('q_char', self.CHAR)],
                        'question_type': ('question_type', self.RAW),
                        'paragraph': [('c_word', self.WORD), ('c_char', self.CHAR)],
                        's_idx': ('s_idx', self.LABEL),
-                       'e_idx': ('e_idx', self.LABEL)
-                       # 'yesno_answers': ('yesno_answers', self.LABEL)
+                       'e_idx': ('e_idx', self.LABEL),
+                       'yesno_answers': ('yesno_answers', self.RAW)
         }
 
         list_fields = [('id', self.RAW), ('q_word', self.WORD), ('q_char', self.CHAR),
                        ('question_type', self.RAW), ('c_word', self.WORD), ('c_char', self.CHAR),
-                       ('s_idx', self.LABEL), ('e_idx', self.LABEL)]
-                       # ('yesno_answers', self.LABEL)]
+                       ('s_idx', self.LABEL), ('e_idx', self.LABEL),
+                       ('yesno_answers', self.RAW)
+                       ]
 
         # judge if need to build dataSet
         if not os.path.exists(train_examples_path) or not os.path.exists(dev_examples_path):
@@ -88,7 +88,6 @@ class DuReader(object):
         print("build vocab....")
         self.CHAR.build_vocab(self.train, self.dev)
         self.WORD.build_vocab(self.train, self.dev)
-        # self.q_LABEL.build_vocab(self.train, self.dev)   # lable -> idx
 
         # load pretrained embeddings
         Vectors = vocab.Vectors(self.config["pretrain_emd_file"])
