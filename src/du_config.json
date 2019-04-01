@@ -1,6 +1,6 @@
 {
     "name": "MC",
-    "n_gpu": 1,
+    "n_gpu": 4,
      "data_loader": {
         "type": "DuReader",
         "args":{
@@ -45,7 +45,8 @@
         "monitor": "f1",
         "monitor_mode": "max",
         "dataset_file": "data/dureader/raw/zhidao.dev-v1.1.json",
-        "prediction_file": "./result/predict/prediction.out"
+        "prediction_file": "./result/predict/prediction.out",
+        "log_step": 100
     },
     "visualization": {
         "log_dir": "./result/visual/"

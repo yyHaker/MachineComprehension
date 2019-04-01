@@ -21,11 +21,11 @@ class BiDAF(nn.Module):
         self.args = args["arch"]["args"]
 
         # 1. Character Embedding Layer
-        self.char_emb = nn.Embedding(self.args["char_vocab_size"], self.args["char_dim"], padding_idx=1)
-        nn.init.uniform_(self.char_emb.weight, -0.001, 0.001)
-
-        self.char_conv = nn.Conv2d(1, self.args["char_channel_size"],
-                                   (self.args["char_dim"], self.args["char_channel_width"]))
+        # self.char_emb = nn.Embedding(self.args["char_vocab_size"], self.args["char_dim"], padding_idx=1)
+        # nn.init.uniform_(self.char_emb.weight, -0.001, 0.001)
+        #
+        # self.char_conv = nn.Conv2d(1, self.args["char_channel_size"],
+        #                            (self.args["char_dim"], self.args["char_channel_width"]))
 
         # 2. Word Embedding Layer
         # initialize word embedding with GloVe
@@ -33,16 +33,17 @@ class BiDAF(nn.Module):
 
         # highway network
         assert self.args["hidden_size"] * 2 == (self.args["char_channel_size"] + self.args["word_dim"])
+        self.seq_hidden = self.args["hidden_size"]
         for i in range(2):
             setattr(self, f'highway_linear{i}',
-                    nn.Sequential(Linear(self.args["hidden_size"] * 2, self.args["hidden_size"] * 2),
+                    nn.Sequential(Linear(self.seq_hidden, self.seq_hidden),
                                   nn.ReLU()))
             setattr(self, f'highway_gate{i}',
-                    nn.Sequential(Linear(self.args["hidden_size"] * 2, self.args["hidden_size"] * 2),
+                    nn.Sequential(Linear(self.seq_hidden, self.seq_hidden),
                                   nn.Sigmoid()))
 
         # 3. Contextual Embedding Layer
-        self.context_LSTM = LSTM(input_size=self.args["hidden_size"] * 2,
+        self.context_LSTM = LSTM(input_size=self.seq_hidden,
                                  hidden_size=self.args["hidden_size"],
                                  bidirectional=True,
                                  batch_first=True,
@@ -101,14 +102,14 @@ class BiDAF(nn.Module):
 
             return x
 
-        def highway_network(x1, x2):
+        def highway_network(x):
             """
             :param x1: (batch, seq_len, char_channel_size)
             :param x2: (batch, seq_len, word_dim)
             :return: (batch, seq_len, hidden_size * 2)
             """
             # (batch, seq_len, char_channel_size + word_dim)
-            x = torch.cat([x1, x2], dim=-1)
+            # x = torch.cat([x1, x2], dim=-1)
             for i in range(2):
                 h = getattr(self, f'highway_linear{i}')(x)
                 g = getattr(self, f'highway_gate{i}')(x)
@@ -179,21 +180,24 @@ class BiDAF(nn.Module):
 
             return p1, p2
 
+
         # 1. Character Embedding Layer
-        c_char = char_emb_layer(batch.c_char)
-        q_char = char_emb_layer(batch.q_char)
+        # c_char = char_emb_layer(batch.c_char)
+        # q_char = char_emb_layer(batch.q_char)
         # 2. Word Embedding Layer
         c_word = self.word_emb(batch.c_word[0])
         q_word = self.word_emb(batch.q_word[0])
         c_lens = batch.c_word[1]
         q_lens = batch.q_word[1]
-
+        # print('word ebd layer:', c_word.shape, q_word.shape, c_lens.shape, q_lens.shape)
         # Highway network
-        c = highway_network(c_char, c_word)
-        q = highway_network(q_char, q_word)
+        c = highway_network(c_word)
+        q = highway_network(q_word)
+        # print('Highway:', c.shape, q.shape)
         # 3. Contextual Embedding Layer
         c = self.context_LSTM((c, c_lens))[0]
         q = self.context_LSTM((q, q_lens))[0]
+        # print('Contextual:', c.shape, q.shape)
         # 4. Attention Flow Layer
         g = att_flow_layer(c, q)
         # 5. Modeling Layer

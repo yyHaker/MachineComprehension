@@ -7,7 +7,6 @@
 @file: __init__.py
 @time: 2019/3/9 15:41
 """
-from .logger import *
 from .util import *
 from .nn import *
 from .ema import *

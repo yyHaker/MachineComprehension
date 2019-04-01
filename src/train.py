@@ -11,9 +11,9 @@
 import argparse
 import json
 import os
+import logging
 
 import torch
-from utils import Logger
 
 import data_loader.dureader as module_data
 import model.bidaf as module_arch
@@ -35,9 +35,6 @@ from trainer import Trainer
 
 def main(config, resume):
     """main project"""
-    # get logger
-    train_logger = Logger()
-
     # setup data_loader instances
     data_loader = getattr(module_data, config['data_loader']['type'])(config)
 
@@ -68,8 +65,7 @@ def main(config, resume):
     trainer = Trainer(model, loss, metrics, optimizer,
                       resume=resume,
                       config=config,
-                      data_loader=data_loader,
-                      logger=train_logger)
+                      data_loader=data_loader)
     trainer.train()
 
 
@@ -79,7 +75,12 @@ if __name__ == '__main__':
                         help='config file path (default: None)')
     parser.add_argument('-r', '--resume', default=None, type=str,
                         help='path to latest checkpoint (default: None)')
+    parser.add_argument('-d', '--device', default=None, type=str,
+                        help='indices of GPUs to enable (default: all)')
     args = parser.parse_args()
+
+    if args.device:
+        os.environ["CUDA_VISIBLE_DEVICES"] = args.device
 
     if args.config:
         # load config file
@@ -92,4 +93,15 @@ if __name__ == '__main__':
     else:
         raise AssertionError("Configuration file need to be specified. Add '-c config.json', for example.")
 
+    # prpare logger
+    logger = logging.getLogger('MachineComprehension')
+    logger.setLevel(logging.INFO)
+    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    console_handler = logging.StreamHandler()
+    console_handler.setLevel(logging.INFO)
+    console_handler.setFormatter(formatter)
+    logger.addHandler(console_handler)
+
+    logger.info('Run with config:')
+    logger.info(json.dumps(config, indent=True))
     main(config, args.resume)

@@ -38,7 +38,7 @@ class Trainer(BaseTrainer):
         :param data_loader:
         :param logger:
         """
-        super(Trainer, self).__init__(model, loss, metrics, optimizer, resume, config, logger)
+        super(Trainer, self).__init__(model, loss, metrics, optimizer, resume, config)
         # data loader
         self.data_loader = data_loader
         # if do validation
@@ -66,6 +66,7 @@ class Trainer(BaseTrainer):
         self.model.train()
         total_loss = 0.
         # begin train
+        self.data_loader.train_iter.device = self.device
         for batch_idx, data in enumerate(self.data_loader.train_iter):
             p1, p2 = self.model(data)
             self.optimizer.zero_grad()
@@ -74,7 +75,13 @@ class Trainer(BaseTrainer):
             self.optimizer.step()
 
             total_loss += loss.item() * p1.size()[0]
-
+            if batch_idx % self.log_step == 0:
+                self.logger.info('Train Epoch: {} [{}/{} ({:.0f}%)] Loss: {:.6f}'.format(
+                    epoch,
+                    batch_idx,
+                    len(self.data_loader.train_iter),
+                    100.0 * batch_idx / len(self.data_loader.train_iter),
+                    loss.item()))
             # add scalar to writer
             global_step = (epoch-1) * len(self.data_loader.train) + batch_idx
             self.writer.add_scalar('train_loss', loss.item(), global_step=global_step)
@@ -110,6 +117,7 @@ class Trainer(BaseTrainer):
         total_loss = 0.
         answers = dict()
         with torch.no_grad():
+            self.data_loader.eval_iter.device = self.device
             for batch_idx, data in enumerate(self.data_loader.eval_iter):
                 p1, p2 = self.model(data)
                 loss = self.loss(p1, data.s_idx) + self.loss(p2, data.e_idx)

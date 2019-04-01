@@ -12,11 +12,13 @@ import json
 from torchtext import data
 import torchtext.vocab as vocab
 from utils import *
-
+import logging
 
 class DuReader(object):
     """DuReader dataset loader"""
     def __init__(self, config):
+        # logger
+        self.logger = logging.getLogger('MachineComprehension')
         # params
         self.config = config["data_loader"]["args"]
         # set path
@@ -27,13 +29,13 @@ class DuReader(object):
 
         # judge if need to preprocess raw data files
         if not os.path.exists(f'{data_path}/{self.config["train_file"]}l'):
-            print("preprocess raw data...")
+            self.logger.info("preprocess raw data...")
             self.preprocess(f'{data_path}/{self.config["train_file"]}')
         if not os.path.exists(f'{data_path}/{self.config["dev_file"]}l'):
             self.preprocess(f'{data_path}/{self.config["dev_file"]}')
 
         # define Field
-        print("construct data loader....")
+        self.logger.info("construct data loader....")
         self.RAW = data.RawField()
         self.RAW.is_target = False     # 读取id值
         self.CHRA_NESTING = data.Field(sequential=True, use_vocab=True, tokenize=list, lower=True)
@@ -59,7 +61,7 @@ class DuReader(object):
 
         # judge if need to build dataSet
         if not os.path.exists(train_examples_path) or not os.path.exists(dev_examples_path):
-            print("build dataSet....")
+            self.logger.info("build dataSet....")
             self.train, self.dev = data.TabularDataset.splits(
                 path=data_path,
                 train=f'{self.config["train_file"]}l',
@@ -73,7 +75,7 @@ class DuReader(object):
             torch.save(self.dev.examples, dev_examples_path)
 
         else:
-            print("loading dataSet.....")
+            self.logger.info("loading dataSet.....")
             train_examples = torch.load(train_examples_path)
             dev_examples = torch.load(dev_examples_path)
 
@@ -85,7 +87,7 @@ class DuReader(object):
         #     self.train.examples = [e for e in self.train.examples if len(e.c_word) <= self.config["context_threshold"]]
 
         # build vocab
-        print("build vocab....")
+        self.logger.info("build vocab....")
         self.CHAR.build_vocab(self.train, self.dev)
         self.WORD.build_vocab(self.train, self.dev)
 
@@ -96,7 +98,7 @@ class DuReader(object):
         self.vocab_vectors = self.WORD.vocab.vectors
 
         # build iterators
-        print("building iterators....")
+        self.logger.info("building iterators....")
         self.train_iter, self.eval_iter = data.BucketIterator.splits(datasets=(self.train, self.dev),
                                                                      batch_sizes=[self.config["train_batch_size"], self.config["dev_batch_size"]],
                                                                      sort_key=lambda x: len(x.c_word),
@@ -143,7 +145,7 @@ class DuReader(object):
         with open(path, 'r', encoding="utf-8") as f:
             for idx, line in enumerate(f):
                 if (idx+1) % 1000 == 0:
-                    print("processed: ", idx+1)
+                    self.logger.info("processed: ", idx+1)
                 sample = json.loads(line.strip())
                 # just pass for no answer sample.
                 if len(sample["answers"]) == 0:
@@ -161,7 +163,7 @@ class DuReader(object):
                     = self.find_para_fake_answer(sample)
                 datas.append(data)
         # write to processed data file
-        print("processed done! write to file!")
+        self.logger.info("processed done! write to file!")
         with codecs.open(f'{path}l', "w", encoding="utf-8") as f_out:
             for line in datas:
                 json.dump(line, f_out)
@@ -224,7 +226,3 @@ if __name__ == "__main__":
     dureader = DuReader(config)
     for idx, data in enumerate(dureader.eval_iter):
         print("idx: ", idx, " ", data)
-
-
-
-

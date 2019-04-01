@@ -26,7 +26,7 @@ class BaseTrainer(object):
     You only need to inherit BaseTrainer and realise the _train_epoch method.
     """
 
-    def __init__(self, model, loss, metrics, optimizer, resume, config, logger=None):
+    def __init__(self, model, loss, metrics, optimizer, resume, config):
         """
         :param model:
         :param loss:
@@ -34,11 +34,9 @@ class BaseTrainer(object):
         :param optimizer:
         :param resume: bool, if resume from checkpoints.
         :param config:
-        :param logger: if given , use your own logger.
         """
         self.config = config
-        self.train_logger = logger
-        self.logger = logging.getLogger(self.__class__.__name__)
+        self.logger = logging.getLogger('MachineComprehension')
 
         # setup GPU device if available, move model into configured device
         self.device, device_ids = self._prepare_device(config['n_gpu'])
@@ -61,6 +59,7 @@ class BaseTrainer(object):
         assert self.monitor_mode in ['min', 'max', 'off']
         self.monitor_best = math.inf if self.monitor_mode == 'min' else -math.inf
         self.start_epoch = 1
+        self.log_step = config['trainer']['log_step']
 
         # setup directory for checkpoint saving
         start_time = datetime.datetime.now().strftime('%m%d_%H%M%S')
@@ -118,8 +117,7 @@ class BaseTrainer(object):
                     log[key] = value    # log["EM"] = EM, log["f1"] = f1
 
             # print logged information to the screen
-            if self.train_logger is not None:
-                self.train_logger.add_entry(log)
+            self.logger.info(log)
 
             # evaluate model performance according to configured metric, save best checkpoint as model_best
             best = False
@@ -169,7 +167,6 @@ class BaseTrainer(object):
         state = {
             'arch': arch,
             'epoch': epoch,
-            'logger': self.train_logger,
             'state_dict': self.model.state_dict(),
             'optimizer': self.optimizer.state_dict(),
             'monitor_best': self.monitor_best,
@@ -191,7 +188,6 @@ class BaseTrainer(object):
         state = {
             'arch': arch,
             'epoch': epoch,
-            'logger': self.train_logger,
             'state_dict': self.model.state_dict(),
             'optimizer': self.optimizer.state_dict(),
             'monitor_best': self.monitor_best,
@@ -230,5 +226,4 @@ class BaseTrainer(object):
         else:
             self.optimizer.load_state_dict(checkpoint['optimizer'])
 
-        self.train_logger = checkpoint['logger']
         self.logger.info("Checkpoint '{}' (epoch {}) loaded".format(resume_path, self.start_epoch))
