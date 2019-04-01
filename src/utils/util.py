@@ -22,7 +22,7 @@ def tokenizer(text):
 
 
 def CN_tokenizer(text):
-    return jieba.cut(text)
+    return list(jieba.cut(text))
 
 
 def dumpObj(obj, file):
@@ -74,5 +74,5 @@ if __name__ == "__main__":
     text = "I like playing computer games."
     sent = "I want to watch tv in living room"
     text2 = "网站赌博输钱报警有吗"
-    print(word_tokenize(text2))
+    print(CN_tokenizer(text2))
     print(tokenizer(sent))

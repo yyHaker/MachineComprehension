@@ -4,13 +4,13 @@
      "data_loader": {
         "type": "DuReader",
         "args":{
-            "data_path": "data/dureader/raw",
+            "data_path": "data/dureader/process",
             "train_file": "zhidao.train.json",
             "dev_file": "zhidao.dev.json",
             "train_batch_size": 64,
             "dev_batch_size": 16,
             "context_threshold": 500,
-            "pretrain_emd_file": "glove.6B.100d.txt",
+            "pretrain_emd_file": "sougou_100_nobinary",
             "device": "cuda"
         }
     },

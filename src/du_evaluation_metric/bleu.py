@@ -57,6 +57,7 @@ class BLEU(object):
             bleu_list[n] = bleu_list[n] * bp
         return bleu_list
 
+
 class BLEUWithBonus(BLEU):
     def __init__(self, n_size, alpha=1.0, beta=1.0):
         super(BLEUWithBonus, self).__init__(n_size)

@@ -7,8 +7,8 @@
 @file: basic_metric.py
 @time: 2019/3/25 15:10
 """
-import sys
 from collections import Counter
+from nltk.translate.bleu_score import sentence_bleu, SmoothingFunction
 
 
 def metric_max_over_ground_truths(metric_fn, prediction, ground_truths):
@@ -16,8 +16,8 @@ def metric_max_over_ground_truths(metric_fn, prediction, ground_truths):
     This function calculates and returns the precision, recall and f1-score
     Args:
         metric_fn: metric function pointer which calculates scores according to corresponding logic.
-        prediction: prediction string or list to be matched
-        ground_truth: golden string or list reference
+        prediction: prediction string list to be matched.
+        ground_truths: golden string list reference.
     Returns:
         floats of (p, r, f1)
     Raises:
@@ -93,8 +93,30 @@ def f1_score(prediction, ground_truth):
     return precision_recall_f1(prediction, ground_truth)[2]
 
 
+def blue4(prediction, ground_truth):
+    """
+        This function calculates and returns the blue4-score
+        Args:
+            prediction: prediction string or list to be matched
+            ground_truth: golden string or list reference
+        Returns:
+            floats of f1
+        Raises:
+            None
+    """
+    prediction = prediction
+    ground_truth = [ground_truth]
+    # chencherry = SmoothingFunction()
+    return sentence_bleu(ground_truth, prediction)
+
+
 if __name__ == "__main__":
     pred= "我的和你的"
     gold = "我和你"
     value = precision_recall_f1(pred, gold)
     print(value)
+    print("calc blue4: ")
+    groud_truth = ['this', 'is', 'a', 'test', "hello"]
+    prediction = ['this', 'is']
+    score = blue4(prediction, groud_truth)
+    print(score)

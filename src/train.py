@@ -45,6 +45,12 @@ def main(config, resume):
     config['arch']['args']['char_vocab_size'] = len(data_loader.CHAR.vocab)
     config['arch']['args']['word_vocab_size'] = len(data_loader.WORD.vocab)
 
+    # print some data
+    for idx, data in enumerate(data_loader.eval_iter):
+        print("idx: ", idx, " ", data)
+        if idx > 5:
+            break
+
     # build model architecture
     model = getattr(module_arch, config['arch']['type'])(config, data_loader.vocab_vectors)
 
