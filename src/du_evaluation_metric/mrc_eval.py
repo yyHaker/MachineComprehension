@@ -179,6 +179,27 @@ def main(args):
     print(json.dumps(metrics, ensure_ascii=False).encode('utf8'))
 
 
+def calc_score(pred_file, ref_file):
+    err = None
+    metrics = {}
+    bleu4, rouge_l = 0.0, 0.0
+    alpha = 1.0  # default 1.0
+    beta = 1.0  # default 1.0
+    bleu_eval = BLEUWithBonus(4, alpha=alpha, beta=beta)
+    rouge_eval = RougeLWithBonus(alpha=alpha, beta=beta, gamma=1.2)
+    pred_result = read_file(pred_file)
+    ref_result = read_file(ref_file, is_ref=True)
+    bleu4, rouge_l = calc_metrics(pred_result,
+                                  ref_result,
+                                  bleu_eval,
+                                  rouge_eval)
+    metrics = {
+        'ROUGE-L': round(rouge_l * 100, 2),
+        'BLEU-4': round(bleu4 * 100, 2),
+    }
+    return metrics
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('pred_file', help='predict file')

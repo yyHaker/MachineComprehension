@@ -115,7 +115,7 @@ class BaseTrainer(object):
                 elif key == 'val_metrics':
                     log.update({'val_' + mtr.__name__: value[i] for i, mtr in enumerate(self.metrics)})
                 else:  # others
-                    log[key] = value    # log["EM"] = EM, log["f1"] = f1
+                    log[key] = value    # log["ROUGE-L"] = ROUGE-L, log["BLUE-4"] = BLUE-4
 
             # print logged information to the screen
             if self.train_logger is not None:

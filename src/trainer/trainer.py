@@ -16,6 +16,7 @@ import codecs
 import os
 
 from utils import squad_evaluate, ensure_dir
+from du_evaluation_metric import calc_score
 
 
 class Trainer(BaseTrainer):
@@ -88,14 +89,11 @@ class Trainer(BaseTrainer):
         # if evaluate
         if self.do_validation:
             result = self._valid_epoch(epoch)
-        self.logger.info("Training epoch {} done, avg loss: {}, EM :{}, f1: {}".format(epoch, avg_loss,
-                                                                                       result["EM"], result["f1"]))
-        self.writer.add_scalar("eval_EM", result["EM"], global_step=epoch * len(self.data_loader.train))
-        self.writer.add_scalar("eval_f1", result["f1"], global_step=epoch * len(self.data_loader.train))
-        return {
-            "EM": result["EM"],
-            "f1": result["f1"]
-        }
+        self.logger.info("Training epoch {} done, avg loss: {}, ROUGE-L :{}, BLUE-4: {}".format(epoch, avg_loss,
+                                                                                               result["ROUGE-L"], result["BLUE-4"]))
+        self.writer.add_scalar("eval_ROUGE-L", result["ROUGE-L"], global_step=epoch * len(self.data_loader.train))
+        self.writer.add_scalar("eval_BLUE-4", result["BLUE-4"], global_step=epoch * len(self.data_loader.train))
+        return result
 
     def _valid_epoch(self, epoch):
         """
@@ -108,7 +106,7 @@ class Trainer(BaseTrainer):
         """
         self.model.eval()
         total_loss = 0.
-        answers = dict()
+        preds = []
         with torch.no_grad():
             for batch_idx, data in enumerate(self.data_loader.eval_iter):
                 p1, p2 = self.model(data)
@@ -131,23 +129,36 @@ class Trainer(BaseTrainer):
                 s_idx = torch.gather(s_idx, 1, e_idx.view(-1, 1)).squeeze()
 
                 for i in range(batch_size):
-                    id = data.id[i]
+                    pred = {}
+                    # get question id, answer, question
+                    q_id = data.id[i]
                     answer = data.c_word[0][i][s_idx[i]:e_idx[i] + 1]
                     answer = ' '.join([self.data_loader.WORD.vocab.itos[idx] for idx in answer])
-                    answers[id] = answer
+                    question = data.q_word[0][i]
+                    question = ' '.join([self.data_loader.WORD.vocab.itos[idx] for idx in question])
+                    # for pred
+                    pred["question_id"] = q_id
+                    pred["question"] = question
+                    pred["answers"] = [answer]
+                    pred["question_type"] = data.question_type[i]
+                    pred["yesno_answers"] = []  # not predict now
+                    preds.append(pred)
 
         # calc loss
         val_loss = total_loss / (len(self.data_loader.dev) + 0.)
         self.logger.info('Val Epoch: {}, loss: {:.6f}'.format(epoch, val_loss))
-        # evaluate (F1 and EM)
+        # evaluate (F1 and Rouge_L)
         predict_file = self.config["trainer"]["prediction_file"]
         ensure_dir(os.path.split(predict_file)[0])
         with codecs.open(predict_file, 'w', encoding='utf-8') as f:
-            print(json.dumps(answers), file=f)
-        results = squad_evaluate.main(self.config["trainer"]["dataset_file"], self.config["trainer"]["prediction_file"])
+            for pred in preds:
+                json.dump(pred, f)
+                print("", file=f)
+        # ref file
+        ref_file = self.config["trainer"]["ref_file"]
+        dev_file = self.config["data_loader"]["args"]["dev_file"]
+        ref_file = dev_file
+        results = calc_score(predict_file, ref_file)
         # metrics dict
         # metrics = np.array([val_loss])
-        return {
-            "EM": results["exact_match"],
-            "f1": results["f1"]
-        }
+        return results
