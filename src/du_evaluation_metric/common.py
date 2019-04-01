@@ -12,13 +12,13 @@ def get_match_size(cand_ngram, refs_ngram):
         tmp_ref_set = defaultdict(int)
         for ngram in ref_ngram:
             tmp_ref_set[ngram] += 1
-        for ngram, count in tmp_ref_set.iteritems():
+        for ngram, count in tmp_ref_set.items():
             ref_set[ngram] = max(ref_set[ngram], count)
     cand_set = defaultdict(int)
     for ngram in cand_ngram:
         cand_set[ngram] += 1
     match_size = 0
-    for ngram, count in cand_set.iteritems():
+    for ngram, count in cand_set.items():
         match_size += min(count, ref_set.get(ngram, 0))
     cand_size = len(cand_ngram)
     return match_size, cand_size

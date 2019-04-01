@@ -79,7 +79,8 @@ def read_file(file_name, is_ref=False):
 
     results = {}
     if is_ref:
-        keys = ['source', 'answers', 'yesno_answers', 'entity_answers', 'question_type']
+        # keys = ['source', 'answers', 'yesno_answers', 'entity_answers', 'question_type']
+        keys = ['answers', 'yesno_answers', 'entity_answers', 'question_type']
     else:
         keys = ['answers', 'yesno_answers']
 
@@ -120,7 +121,7 @@ def calc_metrics(pred_result, ref_result, bleu_eval, rouge_eval):
     Returns:
         bleu-4 and rouge-l values as a tuple of float values.
     """
-    for qid, results in ref_result.iteritems():
+    for qid, results in ref_result.items():
         cand_result = pred_result.get(qid, {})
         pred_answers = cand_result.get('answers', [])
         if not pred_answers:
@@ -174,7 +175,7 @@ def main(args):
             rouge_eval)
     metrics = {
             'ROUGE-L': round(rouge_l * 100, 2),
-            'BLEU-4': round(bleu4 * 100, 2),
+            'BLUE-4': round(bleu4 * 100, 2),
             }
     print(json.dumps(metrics, ensure_ascii=False).encode('utf8'))
 
@@ -195,7 +196,7 @@ def calc_score(pred_file, ref_file):
                                   rouge_eval)
     metrics = {
         'ROUGE-L': round(rouge_l * 100, 2),
-        'BLEU-4': round(bleu4 * 100, 2),
+        'BLUE-4': round(bleu4 * 100, 2),
     }
     return metrics
 

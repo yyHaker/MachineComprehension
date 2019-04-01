@@ -103,7 +103,8 @@ class DuReader(object):
                                                                      batch_sizes=[self.config["train_batch_size"], self.config["dev_batch_size"]],
                                                                      sort_key=lambda x: len(x.c_word),
                                                                      sort_within_batch=True,
-                                                                     device=self.config["device"])
+                                                                     device=self.config["device"],
+                                                                     shuffle=True)
 
     def preprocess(self, path, train=True):
         """preprocess the process data to a list of dict.

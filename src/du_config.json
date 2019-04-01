@@ -18,7 +18,7 @@
         "type": "BiDAF",
         "args": {
             "char_dim": 8,
-            "char_channel_width": 5,
+            "char_channel_width": 3,
             "char_channel_size": 100,
             "word_dim": 100,
             "context_threshold": 400,
@@ -42,7 +42,7 @@
         "save_dir": "./result/dureader/saved/",
         "save_freq": 10,
         "verbosity": 2,
-        "monitor": "f1",
+        "monitor": "ROUGE-L",
         "monitor_mode": "max",
         "ref_file": "./result/predict/ref.json",
         "prediction_file": "./result/predict/prediction.json",

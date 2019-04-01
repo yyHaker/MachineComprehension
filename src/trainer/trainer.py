@@ -163,8 +163,9 @@ class Trainer(BaseTrainer):
                 json.dump(pred, f)
                 print("", file=f)
         # ref file
-        ref_file = self.config["trainer"]["ref_file"]
-        dev_file = self.config["data_loader"]["args"]["dev_file"]
+        # ref_file = self.config["trainer"]["ref_file"]
+        dev_file = os.path.join(self.config["data_loader"]["args"]["data_path"],
+                                self.config["data_loader"]["args"]["dev_file"])
         ref_file = dev_file
         results = calc_score(predict_file, ref_file)
         # metrics dict
