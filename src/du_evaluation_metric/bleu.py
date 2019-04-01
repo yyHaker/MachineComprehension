@@ -5,9 +5,7 @@ import math
 import json
 from collections import defaultdict
 import sys
-import common
-reload(sys)
-sys.setdefaultencoding("utf-8")
+from .common import *
 
 
 class BLEU(object):
@@ -24,14 +22,14 @@ class BLEU(object):
         self.count_bp(cand, ref_list)
 
     def count_ngram(self, cand, ref_list, n_size):
-        cand_ngram = common.get_ngram(cand, n_size)
+        cand_ngram = get_ngram(cand, n_size)
         refs_ngram = []
         for ref in ref_list:
-            refs_ngram.append(common.get_ngram(ref, n_size))
+            refs_ngram.append(get_ngram(ref, n_size))
         if n_size not in self.match_ngram:
             self.match_ngram[n_size] = 0
             self.candi_ngram[n_size] = 0
-        match_size, cand_size = common.get_match_size(cand_ngram, refs_ngram)
+        match_size, cand_size = get_match_size(cand_ngram, refs_ngram)
         self.match_ngram[n_size] += match_size
         self.candi_ngram[n_size] += cand_size
 
@@ -77,20 +75,20 @@ class BLEUWithBonus(BLEU):
 
     def add_yn_bonus(self, cand, ref_list, yn_label, yn_ref):
         for n_size in range(self.n_size):
-            cand_ngram = common.get_ngram(cand, n_size, label=yn_label)
+            cand_ngram = get_ngram(cand, n_size, label=yn_label)
             ref_ngram = []
             for ref_id, r in enumerate(yn_ref):
-                ref_ngram.append(common.get_ngram(ref_list[ref_id], n_size, label=r))
-            match_size, cand_size = common.get_match_size(cand_ngram, ref_ngram)
+                ref_ngram.append(get_ngram(ref_list[ref_id], n_size, label=r))
+            match_size, cand_size = get_match_size(cand_ngram, ref_ngram)
             self.match_ngram[n_size] += self.alpha * match_size
             self.candi_ngram[n_size] += self.alpha * match_size
 
     def add_entity_bonus(self, cand, entity_ref):
         for n_size in range(self.n_size):
-            cand_ngram = common.get_ngram(cand, n_size, label='ENTITY')
+            cand_ngram = get_ngram(cand, n_size, label='ENTITY')
             ref_ngram = []
             for reff_id, r in enumerate(entity_ref):
-                ref_ngram.append(common.get_ngram(r, n_size, label='ENTITY'))
-            match_size, cand_size = common.get_match_size(cand_ngram, ref_ngram)
+                ref_ngram.append(get_ngram(r, n_size, label='ENTITY'))
+            match_size, cand_size = get_match_size(cand_ngram, ref_ngram)
             self.match_ngram[n_size] += self.beta * match_size
             self.candi_ngram[n_size] += self.beta * match_size

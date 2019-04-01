@@ -102,7 +102,8 @@ class DuReader(object):
         self.train_iter, self.eval_iter = data.BucketIterator.splits(datasets=(self.train, self.dev),
                                                                      batch_sizes=[self.config["train_batch_size"], self.config["dev_batch_size"]],
                                                                      sort_key=lambda x: len(x.c_word),
-                                                                     sort_within_batch=True)
+                                                                     sort_within_batch=True,
+                                                                     device=self.config["device"])
 
     def preprocess(self, path, train=True):
         """preprocess the process data to a list of dict.

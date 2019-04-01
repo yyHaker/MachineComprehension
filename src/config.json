@@ -42,7 +42,7 @@
         "save_dir": "./result/saved/",
         "save_freq": 10,
         "verbosity": 2,
-        "monitor": "f1",
+        "monitor": "ROUGE-L",
         "monitor_mode": "max",
         "dataset_file": "data/squad/dev-v1.1.json",
         "prediction_file": "./result/predict/prediction.out"

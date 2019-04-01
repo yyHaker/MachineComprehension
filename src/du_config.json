@@ -44,8 +44,8 @@
         "verbosity": 2,
         "monitor": "f1",
         "monitor_mode": "max",
-        "dataset_file": "data/dureader/raw/zhidao.dev-v1.1.json",
-        "prediction_file": "./result/predict/prediction.out",
+        "ref_file": "./result/predict/ref.json",
+        "prediction_file": "./result/predict/prediction.json",
         "log_step": 100
     },
     "visualization": {

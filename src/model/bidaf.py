@@ -94,7 +94,9 @@ class BiDAF(nn.Module):
             # (batch * seq_len, 1, char_dim, word_len)
             x = x.view(-1, self.args["char_dim"], x.size(2)).unsqueeze(1)
             # (batch * seq_len, char_channel_size, 1, conv_len) -> (batch * seq_len, char_channel_size, conv_len)
-            x = self.char_conv(x).squeeze()
+            print("before x size: ", x.size())   # 576, 1, 8, 5
+            x = self.char_conv(x).squeeze()    #
+            print("x size: ", x.size())
             # (batch * seq_len, char_channel_size, 1) -> (batch * seq_len, char_channel_size)
             x = F.max_pool1d(x, x.size(2)).squeeze()
             # (batch, seq_len, char_channel_size)

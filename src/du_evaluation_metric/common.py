@@ -5,6 +5,7 @@ import json
 from collections import defaultdict
 import sys
 
+
 def get_match_size(cand_ngram, refs_ngram):
     ref_set = defaultdict(int)
     for ref_ngram in refs_ngram:
@@ -22,6 +23,7 @@ def get_match_size(cand_ngram, refs_ngram):
     cand_size = len(cand_ngram)
     return match_size, cand_size
 
+
 def get_ngram(sent, n_size, label=None):
     def _ngram(sent, n_size):
         ngram_list = []
@@ -33,6 +35,7 @@ def get_ngram(sent, n_size, label=None):
     if label is not None:
         ngram_list = [ngram + '_' + label for ngram in ngram_list]
     return ngram_list
+
 
 def word2char(str_in):
     str_out = str_in.replace(' ', '')
