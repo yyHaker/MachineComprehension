@@ -20,17 +20,8 @@ import model.bidaf as module_arch
 import loss.loss as module_loss
 import metric.metric as module_metric
 from trainer import Trainer
-
-
-# def get_instance(module, name, config, *args):
-#     """get a instance of the object according to the params.
-#     :param module: module
-#     :param name: class name
-#     :param config: config json file
-#     :param args: position params
-#     :return:
-#     """
-#     return getattr(module, config[name]['type'])(*args, **config[name]['args'])
+from utils import ensure_dir
+import codecs
 
 
 def main(config, resume):
@@ -60,6 +51,7 @@ def main(config, resume):
                       resume=resume,
                       config=config,
                       data_loader=data_loader)
+
     trainer.train()
 
 
@@ -88,7 +80,7 @@ if __name__ == '__main__':
         raise AssertionError("Configuration file need to be specified. Add '-c config.json', for example.")
 
     # prpare logger
-    logger = logging.getLogger('MachineComprehension')
+    logger = logging.getLogger('MC')
     logger.setLevel(logging.INFO)
     formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
     console_handler = logging.StreamHandler()
@@ -96,6 +88,6 @@ if __name__ == '__main__':
     console_handler.setFormatter(formatter)
     logger.addHandler(console_handler)
 
-    logger.info('Run with config:')
-    logger.info(json.dumps(config, indent=True))
+    # logger.info('Run with config:')
+    # logger.info(json.dumps(config, indent=True))
     main(config, args.resume)

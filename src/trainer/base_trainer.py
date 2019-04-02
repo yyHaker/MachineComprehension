@@ -36,7 +36,7 @@ class BaseTrainer(object):
         :param config:
         """
         self.config = config
-        self.logger = logging.getLogger('MachineComprehension')
+        self.logger = logging.getLogger('MC')
 
         # setup GPU device if available, move model into configured device
         self.device, device_ids = self._prepare_device(config['n_gpu'])
@@ -62,11 +62,11 @@ class BaseTrainer(object):
         self.log_step = config['trainer']['log_step']
 
         # setup directory for checkpoint saving
-        start_time = datetime.datetime.now().strftime('%m%d_%H%M%S')
-        self.checkpoint_dir = os.path.join(config['trainer']['save_dir'], config['name'], start_time)
+        # start_time = datetime.datetime.now().strftime('%m%d_%H%M%S')
+        self.checkpoint_dir = os.path.join(config['trainer']['save_dir'], config['arch']['type'])
 
         # setup visualization writer instance
-        writer_dir = os.path.join(config['visualization']['log_dir'], config['name'], start_time)
+        writer_dir = os.path.join(config['visualization']['log_dir'], config['arch']['type'])
         self.writer = SummaryWriter(log_dir=writer_dir)
 
         # Save configuration file into checkpoint directory:
@@ -117,7 +117,7 @@ class BaseTrainer(object):
                     log[key] = value    # log["ROUGE-L"] = ROUGE-L, log["BLUE-4"] = BLUE-4
 
             # print logged information to the screen
-            self.logger.info(log)
+            # self.logger.info(log)
 
             # evaluate model performance according to configured metric, save best checkpoint as model_best
             best = False
@@ -172,9 +172,9 @@ class BaseTrainer(object):
             'monitor_best': self.monitor_best,
             'config': self.config
         }
-        best_path = os.path.join(self.checkpoint_dir, 'model_best_acc_{}.pth'.format(self.monitor_best))
+        best_path = os.path.join(self.checkpoint_dir, 'model_best_Rouge_{}.pth'.format(self.monitor_best))
         torch.save(state, best_path)
-        self.logger.info("Saving current best: {} ...".format('model_best_acc{}.pth'.format(self.monitor_best)))
+        self.logger.info("Saving current best: {} ...".format('model_best_Rouge_{}.pth'.format(self.monitor_best)))
 
     def _save_checkpoint(self, epoch, save_best=False):
         """
