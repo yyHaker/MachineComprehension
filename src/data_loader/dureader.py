@@ -176,14 +176,18 @@ class DuReader(object):
         """
         # read process data.
         datas = []
-        with open(path, 'r', encoding="utf-8") as f:
+        with open(path, 'r', encoding='utf-8') as f:
             for idx, line in enumerate(f):
                 if (idx + 1) % 1000 == 0:
                     self.logger.info("processed: {}".format(idx + 1))
                 sample = json.loads(line.strip())
                 # just pass for no answer sample.(for train)
                 if train:
-                    if "answers" not in sample.keys() or len(sample["answers"]) == 0:
+                    if len(sample["answers"]) == 0:
+                        continue
+                    if len(sample['answer_spans']) == 0:
+                        continue
+                    if sample['answer_spans'][0][1] >= 500:
                         continue
                 # copy to data
                 data = {}
@@ -196,18 +200,31 @@ class DuReader(object):
                     data["yesno_answers"] = []
                 if train:
                     # find para
-                    # sample["answer_docs"]有可能为空
+                    # sample["answer_docs"]有可能为空，即使answer不为空
                     if len(sample["answer_docs"]) == 0:
                         continue
                     answer_doc_idx = sample["answer_docs"][0]
+                    # make sure answer doc idx in len(sample["documents"]
+                    if answer_doc_idx not in range(len(sample["documents"])):
+                        print("doc idx: ", answer_doc_idx,  "  len(documents): ", len(sample["documents"]))
+                        continue
                     related_para_idx = sample["documents"][answer_doc_idx]["most_related_para"]
                     data["paragraph"] = sample["documents"][answer_doc_idx]["segmented_paragraphs"][related_para_idx]
                     # find answer span
                     data["s_idx"], data["e_idx"] = sample["answer_spans"][0][0], sample["answer_spans"][0][1]
                     data["match_score"] = sample["match_scores"][0]
                 else:
-                    # for test data how to choose paragraph(not use for now)
-                    data["paragraph"] = sample["documents"][0]["segmented_paragraphs"][0]
+                    # for test data how to choose paragraph(match question)
+                    max_score = 0.
+                    best_para = []
+                    docs = sample["documents"][: 3]
+                    for doc in docs:
+                        for p_idx, para_tokens in enumerate(doc['segmented_paragraphs']):
+                            score = metric_max_over_ground_truths(recall, para_tokens, sample["segmented_question"])
+                            if score > max_score:
+                                max_score = score
+                                best_para = para_tokens
+                    data["paragraph"] = best_para
                 datas.append(data)
         # write to processed data file
         self.logger.info("processed done! write to file!")
