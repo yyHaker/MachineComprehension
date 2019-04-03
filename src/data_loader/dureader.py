@@ -14,6 +14,7 @@ import torchtext.vocab as vocab
 from utils import *
 import logging
 
+
 class DuReader(object):
     """DuReader dataset loader"""
     def __init__(self, config):
@@ -104,7 +105,7 @@ class DuReader(object):
                                                                      sort_key=lambda x: len(x.c_word),
                                                                      sort_within_batch=True,
                                                                      device=self.config["device"],
-                                                                     shuffle=True)
+                                                                     shuffle=[True, False])
 
     def preprocess(self, path, train=True):
         """preprocess the process data to a list of dict.

@@ -32,8 +32,8 @@ class BiDAF(nn.Module):
         self.word_emb = nn.Embedding.from_pretrained(pretrained, freeze=True)
 
         # highway network
-        assert self.args["hidden_size"] * 2 == (self.args["char_channel_size"] + self.args["word_dim"])
-        self.seq_hidden = self.args["hidden_size"]
+        # assert self.args["hidden_size"] * 2 == (self.args["char_channel_size"] + self.args["word_dim"])
+        self.seq_hidden = self.args["word_dim"]
         for i in range(2):
             setattr(self, f'highway_linear{i}',
                     nn.Sequential(Linear(self.seq_hidden, self.seq_hidden),
