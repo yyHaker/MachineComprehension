@@ -28,6 +28,12 @@ def predict(args):
     """
     # get logger
     logger = logging.getLogger('MC')
+    if "zhidao" in args.model:
+        logger.info("use zhidao models...")
+    elif "search" in args.model:
+        logger.info("use search model....")
+    else:
+        raise Exception("Unknown  models!")
     # load best model and params
     model_path = os.path.join(args.path, args.model)
     state = torch.load(model_path)
@@ -52,6 +58,7 @@ def predict(args):
     with torch.no_grad():
         # data_loader.test_iter.device = device
         for batch_idx, data in enumerate(data_loader.test_iter):
+            print(data)
             p1, p2 = model(data)
             # 统计得到的answers
             # (batch, c_len, c_len)
@@ -69,9 +76,9 @@ def predict(args):
                 # get question id, answer, question
                 q_id = data.id[i]
                 answer = data.c_word[0][i][s_idx[i]:e_idx[i] + 1]
-                answer = ' '.join([data_loader.WORD.vocab.itos[idx] for idx in answer])
+                answer = ''.join([data_loader.WORD.vocab.itos[idx] for idx in answer])
                 question = data.q_word[0][i]
-                question = ' '.join([data_loader.WORD.vocab.itos[idx] for idx in question])
+                question = ''.join([data_loader.WORD.vocab.itos[idx] for idx in question])
                 # for pred
                 pred["question_id"] = q_id
                 pred["question"] = question
@@ -84,13 +91,13 @@ def predict(args):
     ensure_dir(os.path.split(predict_file)[0])
     with codecs.open(predict_file, 'w', encoding='utf-8') as f:
         for pred in preds:
-            json.dump(pred, f)
+            json.dump(pred, f, ensure_ascii=False)
             print("", file=f)
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='PyTorch MC')
-    parser.add_argument('-p', "--path", default="./result/dureader/saved/BiDAF", type=str, help="best model directory")
+    parser.add_argument('-p', "--path", default="./result/dureader/saved", type=str, help="best model directory")
     parser.add_argument('-m', '--model', default=None, type=str, help="best model name(.pth)")
     parser.add_argument('-t', "--target", default="./result/predict/result.json", type=str, help="prediction result file")
     parser.add_argument('-d', '--device', default=None, type=str, help='indices of GPUs to enable (default: all)')

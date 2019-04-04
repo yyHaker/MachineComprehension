@@ -1,14 +1,15 @@
 {
     "name": "MC",
-    "n_gpu": 4,
+    "n_gpu": 1,
      "data_loader": {
         "type": "DuReader",
         "args":{
-            "data_path": "data/dureader/process",
+            "data_path": "data/dureader/process/2019/v1.0",
             "train_file": "zhidao.train.json",
             "dev_file": "zhidao.dev.json",
-            "train_batch_size": 64,
-            "dev_batch_size": 16,
+            "test_file": "zhidao.test1.json",
+            "train_batch_size":64,
+            "dev_batch_size":16,
             "context_threshold": 500,
             "pretrain_emd_file": "sougou_100_nobinary",
             "device": "cuda"
@@ -38,13 +39,13 @@
     },
     "metrics": "ACC",
     "trainer": {
-        "epochs": 50,
-        "save_dir": "./result/dureader/saved/",
+        "epochs": 3,
+        "save_dir": "./result/dureader/saved/zhidao",
         "save_freq": 10,
         "verbosity": 2,
         "monitor": "ROUGE-L",
         "monitor_mode": "max",
-        "ref_file": "./result/predict/ref.json",
+        "result_file": "./result/predict/result.json",
         "prediction_file": "./result/predict/prediction.json",
         "log_step": 100
     },

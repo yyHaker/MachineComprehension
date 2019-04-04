@@ -22,9 +22,18 @@ class DuReader(object):
         self.logger = logging.getLogger('MC')
         # params
         self.config = config["data_loader"]["args"]
-        # set path
+        # set path (for raw data)
         data_path = self.config["data_path"]
-        processed_dataset_path = data_path + "/torchtext/"
+
+        # get data_path_l (for processed data (.pt))
+        if "search" in self.config["train_file"]:
+            data_path_l = os.path.join(data_path, "search")
+        elif "zhidao" in self.config["train_file"]:
+            data_path_l = os.path.join(data_path, "zhidao")
+        else:
+            raise Exception("not supported data set now!")
+        ensure_dir(data_path_l)
+        processed_dataset_path = data_path_l + "/torchtext/"
         train_examples_path = processed_dataset_path + 'train_examples.pt'
         dev_examples_path = processed_dataset_path + 'dev_examples.pt'
         test_examples_path = processed_dataset_path + 'test_examples.pt'
@@ -33,9 +42,11 @@ class DuReader(object):
         if not os.path.exists(f'{data_path}/{self.config["train_file"]}l'):
             self.logger.info("preprocess train  data...")
             self.preprocess(f'{data_path}/{self.config["train_file"]}')
+
         if not os.path.exists(f'{data_path}/{self.config["dev_file"]}l'):
             self.logger.info("preprocess dev  data...")
             self.preprocess(f'{data_path}/{self.config["dev_file"]}')
+
         if not os.path.exists(f'{data_path}/{self.config["test_file"]}l'):
             self.logger.info("preprocess test  data...")
             self.preprocess(f'{data_path}/{self.config["test_file"]}', train=False)
@@ -134,11 +145,11 @@ class DuReader(object):
                                                                      device=self.config["device"],
                                                                      shuffle=True)
         self.test_iter = data.BucketIterator(dataset=self.test,
-                                            batch_size=16,
+                                            batch_size=4,
                                             sort_key=lambda x: len(x.c_word),
                                             sort_within_batch=True,
                                             device=self.config["device"],
-                                            shuffle=True)
+                                            shuffle=False)
 
     def preprocess(self, path, train=True):
         """
@@ -187,7 +198,7 @@ class DuReader(object):
                         continue
                     if len(sample['answer_spans']) == 0:
                         continue
-                    if sample['answer_spans'][0][1] >= 500:
+                    if sample["answer_spans"][0][0] < 0 or sample['answer_spans'][0][1] < 0:
                         continue
                 # copy to data
                 data = {}
@@ -209,17 +220,25 @@ class DuReader(object):
                         print("doc idx: ", answer_doc_idx,  "  len(documents): ", len(sample["documents"]))
                         continue
                     related_para_idx = sample["documents"][answer_doc_idx]["most_related_para"]
-                    data["paragraph"] = sample["documents"][answer_doc_idx]["segmented_paragraphs"][related_para_idx]
+                    paragraph = sample["documents"][answer_doc_idx]["segmented_paragraphs"][related_para_idx]
+                    data["paragraph"] = paragraph[: 500] if len(paragraph) >= 500 else paragraph
                     # find answer span
                     data["s_idx"], data["e_idx"] = sample["answer_spans"][0][0], sample["answer_spans"][0][1]
+                    # make sure s_idx, e_idx is in [0, len(data["paragraph"]-1]
+                    if data["e_idx"] > len(data["paragraph"]) - 1:
+                        print("over len e_idx: ", data["e_idx"])
+                        continue
                     data["match_score"] = sample["match_scores"][0]
                 else:
-                    # for test data how to choose paragraph(match question)
+                    # for test data to choose para
                     max_score = 0.
                     best_para = []
-                    docs = sample["documents"][: 3]
+                    docs = sample["documents"]
                     for doc in docs:
+                        if len(doc["segmented_paragraphs"]) == 0:
+                            continue
                         for p_idx, para_tokens in enumerate(doc['segmented_paragraphs']):
+                            para_tokens = para_tokens[: 500] if len(para_tokens) >= 500 else para_tokens
                             score = metric_max_over_ground_truths(recall, para_tokens, sample["segmented_question"])
                             if score > max_score:
                                 max_score = score
@@ -230,7 +249,7 @@ class DuReader(object):
         self.logger.info("processed done! write to file!")
         with codecs.open(f'{path}l', "w", encoding="utf-8") as f_out:
             for line in datas:
-                json.dump(line, f_out)
+                json.dump(line, f_out, ensure_ascii=False)
                 print("", file=f_out)
 
     def pre_preprocess(self, path, train=True):
@@ -290,7 +309,7 @@ class DuReader(object):
                 else:
                     data["yesno_answers"] = []
                 # find para
-                data["paragraph"] = self._find_zhidao_para(sample)
+                data["paragraph"] = self._find_zhidao_para(sample, train=train)
                 # find answer span
                 if train:
                     data["fake_answer"], data["s_idx"], data["e_idx"], data["match_score"] \
@@ -300,10 +319,10 @@ class DuReader(object):
         self.logger.info("processed done! write to file!")
         with codecs.open(f'{path}l', "w", encoding="utf-8") as f_out:
             for line in datas:
-                json.dump(line, f_out)
+                json.dump(line, f_out, ensure_ascii=False)
                 print("", file=f_out)
 
-    def _find_zhidao_para(self, sample):
+    def _find_zhidao_para(self, sample, train=True):
         """find zhidao paragraph.
         ----------
         1. 选择is_selected=True的前3个document
@@ -314,23 +333,26 @@ class DuReader(object):
         """
         best_para = []
         docs = []
-        for doc in sample["documents"]:
-            if doc["is_selected"]:
-                docs.append(doc)
+        if train:
+            for doc in sample["documents"]:
+                if doc["is_selected"]:
+                    docs.append(doc)
+        else:
+            docs = sample["documents"]
         docs = docs[: 3]
         for doc in docs:
             title = doc["segmented_title"]
+            title.append("<sep>")
             paras = doc["segmented_paragraphs"][: 4]
+            best_para = best_para + title
             for para in paras:
-                title = title.append("<sep>")
-                para = title + para
                 best_para = best_para + para
         # 截取一定的长度(默认500)
         best_para = best_para[: 500] if len(best_para) > 500 else best_para
-                # # assert len(para) >= 4 and len(sample["segmented_question"]) >= 4,\
-                # #     print(sample["segmented_question"], ">>>>>>", print(para))
-                # score = blue4(para, sample["segmented_question"])
-                # result.append((para, score, idx))
+        # # assert len(para) >= 4 and len(sample["segmented_question"]) >= 4,\
+        # #     print(sample["segmented_question"], ">>>>>>", print(para))
+        # score = blue4(para, sample["segmented_question"])
+        # result.append((para, score, idx))
         # sort by score
         # result = sorted(result, key=lambda x: x[1], reverse=True)
         # result = result[: top_k]
