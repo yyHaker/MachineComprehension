@@ -141,7 +141,6 @@ class DuReader(object):
                                              device=self.config["device"],
                                              shuffle=True)
 
-
     def preprocess(self, path, train=True):
         """
         read preprocessed data or pre preprocessed data.
@@ -293,12 +292,11 @@ class DuReader(object):
                     data["yesno_answers"] = []
                 # find para
                 if 'zhidao' in path:
-                    data["paragraph"] = self._find_zhidao_para(sample)
+                    data["paragraph"] = self._find_zhidao_para(sample, train=train)
                 elif 'search' in path:
-                    data["paragraph"] = self._find_search_para(sample)
+                    data["paragraph"] = self._find_search_para(sample, train=train)
                 else:
                     raise AssertionError('Invalid path or file name(should include zhidao or search)')
-
                 # find answer span
                 if train:
                     data["fake_answer"], data["s_idx"], data["e_idx"], data["match_score"] \
@@ -308,10 +306,10 @@ class DuReader(object):
         self.logger.info("processed done! write to file!")
         with codecs.open(f'{path}l', "w", encoding="utf-8") as f_out:
             for line in datas:
-                json.dump(line, f_out)
+                json.dump(line, f_out, ensure_ascii=False)
                 print("", file=f_out)
 
-    def _find_zhidao_para(self, sample):
+    def _find_zhidao_para(self, sample, train=True):
         """find zhidao paragraph.
         ----------
         1. 选择is_selected=True的前3个document
@@ -323,7 +321,12 @@ class DuReader(object):
         best_para = []
         docs = []
         for doc in sample["documents"]:
-            if doc["is_selected"]:
+            if train:
+                if doc["is_selected"]:
+                    docs.append(doc)
+                else:
+                    pass
+            else:
                 docs.append(doc)
         docs = docs[: 3]
         for doc in docs:
@@ -347,7 +350,7 @@ class DuReader(object):
         # best_para, _, _ = result[0]
         return best_para
 
-    def _find_search_para(self, sample):
+    def _find_search_para(self, sample, train=True):
         """ find search paragraph
         1. 选择is_select=True的前3篇doc，每个doc取前10个para
         2. 将标题和各段中间插入连接符号<sep>拼接在一起，没有超过最大长度（500）则返回这个段落，否则执行3
@@ -362,7 +365,12 @@ class DuReader(object):
         # 选择前三个document
         docs = []
         for doc in sample["documents"]:
-            if doc["is_selected"]:
+            if train:
+                if doc["is_selected"]:
+                    docs.append(doc)
+                else:
+                    pass
+            else:
                 docs.append(doc)
         docs = docs[:3]
         for doc in docs:
@@ -383,26 +391,29 @@ class DuReader(object):
                 best_para += ['<sep>']
                 # 仅选取前10个段落
                 paras = doc["segmented_paragraphs"][:10]
-                # 计算Recall
-                prf_scores = [precision_recall_f1(para, question) for para in paras]
-                scores = [i[1] for i in prf_scores]
-                # 选取排名前2中最早出现的段落和下一段落
-                scores_idx = [(i, scores[i]) for i in range(len(scores))]
-                sorted_idx = sorted(scores_idx, key=lambda x: x[1], reverse=True)
-                choose_idx = [i[0] for i in sorted_idx[:2]]
-                # 拼接排名前2中最早出现的段落和下一段落
-                early_idx = min(choose_idx)
-                best_para += paras[early_idx]
-                early_next_idx = early_idx + 1
-                if early_next_idx < len(paras):
-                    best_para += paras[early_next_idx]
-                # 拼剩余段落的第一句话
-                for i in sorted_idx:
-                    best_para += self.first_sentence(paras[i[0]])
+                if paras:
+                    # 计算Recall
+                    prf_scores = [precision_recall_f1(para, question) for para in paras]
+                    scores = [i[1] for i in prf_scores]
+                    # 选取排名前2中最早出现的段落和下一段落
+                    scores_idx = [(i, scores[i]) for i in range(len(scores))]
+                    sorted_idx = sorted(scores_idx, key=lambda x: x[1], reverse=True)
+                    choose_idx = [i[0] for i in sorted_idx[:2]]
+                    # 拼接排名前2中最早出现的段落和下一段落
+                    early_idx = min(choose_idx)
+                    best_para += paras[early_idx]
+                    early_next_idx = early_idx + 1
+                    if early_next_idx < len(paras):
+                        best_para += paras[early_next_idx]
+                    # 拼剩余段落的第一句话
+                    for i in sorted_idx:
+                        best_para += self.first_sentence(paras[i[0]])
+                        if len(best_para) > 500:
+                            break
                     if len(best_para) > 500:
                         break
-                # 截取最大长度500
-                best_para = best_para[:500]
+            # 截取最大长度500
+            best_para = best_para[:500]
             return best_para
 
     @staticmethod
@@ -418,9 +429,6 @@ class DuReader(object):
         if s[-1] not in split_tag:
             s.append('。')
         return s
-
-
-
 
     def _find_fake_answer(self, sample, paragraph):
         """find paragraph and fake answer for one sample.
@@ -458,3 +466,4 @@ if __name__ == "__main__":
     dureader = DuReader(config)
     for idx, data in enumerate(dureader.eval_iter):
         print("idx: ", idx, " ", data)
+

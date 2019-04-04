@@ -64,7 +64,7 @@ if __name__ == '__main__':
     parser.add_argument('-d', '--device', default=None, type=str,
                         help='indices of GPUs to enable (default: all)')
     parser.add_argument('-n', '--name', default='MC', type=str,
-                        help='the name to save model')
+                        help='the path name to save model')
     args = parser.parse_args()
 
     if args.device:
@@ -91,6 +91,6 @@ if __name__ == '__main__':
     console_handler.setFormatter(formatter)
     logger.addHandler(console_handler)
 
-    # logger.info('Run with config:')
-    # logger.info(json.dumps(config, indent=True))
+    logger.info('Run with config:')
+    logger.info(json.dumps(config, indent=True))
     main(config, args.resume)

@@ -6,26 +6,14 @@
 @contact: tuomx@qq.com
 @file: divid_preprocessed.py
 @time: 2019/4/3 19:10
+
+# 处理Search文件，输入官方预处理文件，输出改进的预处理文件
 """
 
 import math
 import sys
 import json
 from utils import *
-
-
-def divid_data(data, num):
-    """
-    将数据拆分成num份
-    :param data:
-    :param num:
-    :return:
-    """
-    all_data = [[] for i in range(num)]
-    split_size = math.ceil(len(data) / num)
-    for i in range(num):
-        all_data[i] = data[i * split_size: (i + 1) * split_size]
-    return all_data
 
 
 def first_sentence(para):
@@ -78,26 +66,29 @@ def _find_search_para(sample):
             best_para += ['<sep>']
             # 仅选取前10个段落
             paras = doc["segmented_paragraphs"][:10]
-            # 计算Recall
-            prf_scores = [precision_recall_f1(para, question) for para in paras]
-            scores = [i[1] for i in prf_scores]
-            # 选取排名前2中最早出现的段落和下一段落
-            scores_idx = [(i, scores[i]) for i in range(len(scores))]
-            sorted_idx = sorted(scores_idx, key=lambda x: x[1], reverse=True)
-            choose_idx = [i[0] for i in sorted_idx[:2]]
-            # 拼接排名前2中最早出现的段落和下一段落
-            early_idx = min(choose_idx)
-            best_para += paras[early_idx]
-            early_next_idx = early_idx + 1
-            if early_next_idx < len(paras):
-                best_para += paras[early_next_idx]
-            # 拼剩余段落的第一句话
-            for i in sorted_idx:
-                best_para += first_sentence(paras[i[0]])
+            if len(paras):
+                # 计算Recall
+                prf_scores = [precision_recall_f1(para, question) for para in paras]
+                scores = [i[1] for i in prf_scores]
+                # 选取排名前2中最早出现的段落和下一段落
+                scores_idx = [(i, scores[i]) for i in range(len(scores))]
+                sorted_idx = sorted(scores_idx, key=lambda x: x[1], reverse=True)
+                choose_idx = [i[0] for i in sorted_idx[:2]]
+                # 拼接排名前2中最早出现的段落和下一段落
+                early_idx = min(choose_idx)
+                best_para += paras[early_idx]
+                early_next_idx = early_idx + 1
+                if early_next_idx < len(paras):
+                    best_para += paras[early_next_idx]
+                # 拼剩余段落的第一句话
+                for i in sorted_idx:
+                    best_para += first_sentence(paras[i[0]])
+                    if len(best_para) > 500:
+                        break
                 if len(best_para) > 500:
                     break
-            # 截取最大长度500
-            best_para = best_para[:500]
+        # 截取最大长度500
+        best_para = best_para[:500]
         return best_para
 
 
@@ -205,21 +196,6 @@ def preprocessd(path, save_path, train=True):
 
 
 if __name__ == '__main__':
-    '''
-    path = './preprocess/search.dev.json'
-    with open(path, encoding='utf-8') as f:
-        data = f.readlines()
-    print("Data size:", len(data))
-    
-    all_data = divid_data(data, 16)
-    print('Split data size:{}\t,num:{}'.format(len(all_data[0]), len(all_data)))
-    for idx, d in enumerate(all_data):
-        spilt_path = f'{path}__{idx}'
-        print('Save data:', spilt_path)
-        with open(spilt_path, 'w', encoding='utf-8') as f:
-            for line in d:
-                f.write(line)
-    '''
     path = sys.argv[1]
     save_path = sys.argv[2]
     preprocessd(path, save_path)
