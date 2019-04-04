@@ -114,9 +114,9 @@ if __name__ == "__main__":
     pred= "我的和你的"
     gold = "我和你"
     value = precision_recall_f1(pred, gold)
-    print(value)
+    # print(value)
     print("calc blue4: ")
-    groud_truth = ['this', 'is', 'a', 'test', "hello"]
-    prediction = ['this', 'is']
-    score = blue4(prediction, groud_truth)
+    groud_truth = ['孕妇', '能', '吃', '荔枝', '吗']
+    prediction = ['荔枝', '含有', '丰富', '的', '营养', '元素', '。', '荔枝', '味', '甘', '、', '酸', '、', '性', '温', ',', '入', '心', '、', '脾', '、', '肝经', ',', '孕妇', '可以', '吃', '荔枝', '吗', '?', '答案', '是', '肯定', '的', '。', '孕妇', '可以', '适量', '的', '吃', '一些', '荔枝', '。', '但', '不宜', '多', '吃', ',', '孕妇', '吃', '荔枝', '每次', '以', '100', '—', '200', '克', '为', '宜', ',', '一般', '不要', '超过', '10', '颗', '。']
+    score = blue4(groud_truth, prediction)
     print(score)
