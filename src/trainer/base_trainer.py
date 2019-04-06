@@ -62,11 +62,11 @@ class BaseTrainer(object):
         self.log_step = config['trainer']['log_step']
 
         # setup directory for checkpoint saving
-        # start_time = datetime.datetime.now().strftime('%m%d_%H%M%S')
-        self.checkpoint_dir = os.path.join(config['trainer']['save_dir'], config['arch']['type'])
+        start_time = datetime.datetime.now().strftime('%m%d_%H%M%S')
+        self.checkpoint_dir = os.path.join(config['trainer']['save_dir'], config['name'], start_time)
 
         # setup visualization writer instance
-        writer_dir = os.path.join(config['visualization']['log_dir'], config['arch']['type'])
+        writer_dir = os.path.join(config['visualization']['log_dir'], config['name'], start_time)
         self.writer = SummaryWriter(log_dir=writer_dir)
 
         # Save configuration file into checkpoint directory:
