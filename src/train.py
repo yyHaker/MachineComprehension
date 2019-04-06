@@ -29,6 +29,9 @@ def main(config, resume):
     # setup data_loader instances
     data_loader = getattr(module_data, config['data_loader']['type'])(config)
 
+    # for idx, data in enumerate(data_loader.eval_iter):
+    #     print("idx: ", idx, " ", data)
+
     # add config run params
     config['arch']['args']['char_vocab_size'] = len(data_loader.CHAR.vocab)
     config['arch']['args']['word_vocab_size'] = len(data_loader.WORD.vocab)

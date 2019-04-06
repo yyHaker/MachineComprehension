@@ -141,9 +141,9 @@ class Trainer(BaseTrainer):
                     # get question id, answer, question
                     q_id = data.id[i]
                     answer = data.c_word[0][i][s_idx[i]:e_idx[i] + 1]
-                    answer = ' '.join([self.data_loader.WORD.vocab.itos[idx] for idx in answer])
+                    answer = ''.join([self.data_loader.WORD.vocab.itos[idx] for idx in answer])
                     question = data.q_word[0][i]
-                    question = ' '.join([self.data_loader.WORD.vocab.itos[idx] for idx in question])
+                    question = ''.join([self.data_loader.WORD.vocab.itos[idx] for idx in question])
                     # for pred
                     pred["question_id"] = q_id
                     pred["question"] = question
@@ -160,7 +160,7 @@ class Trainer(BaseTrainer):
         ensure_dir(os.path.split(predict_file)[0])
         with codecs.open(predict_file, 'w', encoding='utf-8') as f:
             for pred in preds:
-                json.dump(pred, f)
+                json.dump(pred, f, ensure_ascii=False)
                 print("", file=f)
         # ref file
         # ref_file = self.config["trainer"]["ref_file"]
