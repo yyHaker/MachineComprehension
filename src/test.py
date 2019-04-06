@@ -58,7 +58,6 @@ def predict(args):
     with torch.no_grad():
         # data_loader.test_iter.device = device
         for batch_idx, data in enumerate(data_loader.test_iter):
-            print(data)
             p1, p2 = model(data)
             # 统计得到的answers
             # (batch, c_len, c_len)
@@ -86,6 +85,9 @@ def predict(args):
                 pred["question_type"] = data.question_type[i]
                 pred["yesno_answers"] = []  # not predict now
                 preds.append(pred)
+            if batch_idx % 10000 == 0:
+                logger.info("predict {} samples done!".format((batch_idx + 1)) * batch_idx)
+
     logger.info("write result to file....")
     predict_file = args.target
     ensure_dir(os.path.split(predict_file)[0])

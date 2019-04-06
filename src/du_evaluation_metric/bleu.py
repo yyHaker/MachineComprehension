@@ -41,6 +41,10 @@ class BLEU(object):
             )[1]
 
     def score(self):
+        # candi_ngram is 0 ?
+        # for n_size in range(self.n_size):
+        #     print("self.candi_ngram {}: {}, self.match_ngram {}: {}".format(n_size,
+        #                                                                     self.candi_ngram[n_size], self.match_ngram[n_size], n_size))
         prob_list = [
                 self.match_ngram[n_size] / float(self.candi_ngram[n_size])
                 for n_size in range(self.n_size)
@@ -67,6 +71,8 @@ class BLEUWithBonus(BLEU):
             ref_list,
             yn_label=None, yn_ref=None, entity_ref=None):
         #super(BLEUWithBonus, self).add_inst(cand, ref_list)
+        # if len(cand) == 0 or len(ref_list) == 0:
+        #     print("cand: {}, ref_list: {}".format(cand, ref_list))
         BLEU.add_inst(self, cand, ref_list)
         if yn_label is not None and yn_ref is not None:
             self.add_yn_bonus(cand, ref_list, yn_label, yn_ref)

@@ -7,7 +7,6 @@
 @file: combine_result.py
 @time: 2019/4/4 09:00
 """
-import os
 import argparse
 import logging
 import json
@@ -18,12 +17,19 @@ def combine(args):
     result_search = args.search_path
     result = args.target_path
     preds = []
+    # for zhidao
     with open(result_zhidao, 'r', encoding='utf-8') as zhidao_file:
         for i, d in enumerate(zhidao_file):
             preds.append(json.loads(d))
+    # for search
     with open(result_search, 'r', encoding='utf-8') as search_file:
         for j, d in enumerate(search_file):
             preds.append(json.loads(d))
+    # for no para search (test1)
+    with open('./result/predict/no_para_search.json', 'r', encoding='utf-8') as no_para_serach_file:
+        for j, d in enumerate(no_para_serach_file):
+            preds.append(json.loads(d))
+    # combine all data
     with open(result, 'w', encoding='utf-8') as f:
         for d in preds:
             json.dump(d, f, ensure_ascii=False)

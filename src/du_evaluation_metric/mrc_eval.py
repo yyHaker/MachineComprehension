@@ -8,6 +8,7 @@ import itertools
 import json
 import sys
 import zipfile
+import codecs
 
 from collections import Counter
 from .bleu import BLEUWithBonus
@@ -42,7 +43,7 @@ def data_check(obj):
         Raises AssertionError when data is not legal.
     """
     assert 'question_id' in obj, "Missing 'question_id' field."
-    #assert 'yesno_answers' in obj, \
+    # assert 'yesno_answers' in obj, \
     #        "Missing 'yesno_answers' field. question_id: {}".format(obj['question_id'])
     if "yesno_answers" in obj:
         assert isinstance(obj['yesno_answers'], list), \
@@ -75,7 +76,7 @@ def read_file(file_name, is_ref=False):
     def _open(file_name, mode, zip_obj=None):
         if zip_obj is not None:
             return zip_obj.open(file_name, mode)
-        return open(file_name, mode)
+        return codecs.open(file_name, mode, encoding='utf-8')
 
     results = {}
     if is_ref:
@@ -121,9 +122,13 @@ def calc_metrics(pred_result, ref_result, bleu_eval, rouge_eval):
     Returns:
         bleu-4 and rouge-l values as a tuple of float values.
     """
+    # count = 0
     for qid, results in ref_result.items():
+        # if qid not in pred_result.keys():
+        #     count += 1
         cand_result = pred_result.get(qid, {})
-        pred_answers = cand_result.get('answers', [])
+        # print("cand_result: ", cand_result)
+        pred_answers = cand_result.get('answers', [])   # pred answers.
         if not pred_answers:
             pred_answers = EMPTY
         else:
@@ -131,7 +136,7 @@ def calc_metrics(pred_result, ref_result, bleu_eval, rouge_eval):
         pred_yn_label = None
         ref_entities = None
         ref_answers = results.get('answers', [])
-        if not ref_answers:
+        if not ref_answers:   # ref answers
             continue
         if results['question_type'] == 'ENTITY':
             ref_entities = set(
@@ -142,6 +147,11 @@ def calc_metrics(pred_result, ref_result, bleu_eval, rouge_eval):
             cand_yesno = cand_result.get('yesno_answers', [])
             pred_yn_label = None if len(cand_yesno) == 0 \
                     else cand_yesno[0]
+        # pred is None
+        # if len(pred_answers) == 0 or len(ref_answers) == 0:
+        #     count += 1
+        #     print("count: ", count)
+            # print("pred_answers: {}, ref_answers: {}".format(pred_answers, ref_answers))
         bleu_eval.add_inst(
                 pred_answers,
                 ref_answers,
@@ -154,6 +164,7 @@ def calc_metrics(pred_result, ref_result, bleu_eval, rouge_eval):
                 yn_label=pred_yn_label,
                 yn_ref=results['yesno_answers'],
                 entity_ref=ref_entities)
+    # print("count: ", count)
     bleu4 = bleu_eval.score()[-1]
     rouge_l = rouge_eval.score()
     return bleu4, rouge_l
