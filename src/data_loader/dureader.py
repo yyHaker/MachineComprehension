@@ -35,7 +35,7 @@ class DuReader(object):
         ensure_dir(data_path_l)
         processed_dataset_path = data_path_l + "/torchtext/"
         train_examples_path = processed_dataset_path + f'{self.config["train_file"]}.pt'
-        dev_examples_path = processed_dataset_path + f'{self.config["eval_file"]}.pt'
+        dev_examples_path = processed_dataset_path + f'{self.config["dev_file"]}.pt'
         test_examples_path = processed_dataset_path + f'{self.config["test_file"]}.pt'
 
         # judge if need to preprocess raw data files
@@ -293,6 +293,7 @@ class DuReader(object):
             "question_id": "",
             "question": "",
             "question_type": "",
+            "paragraphs": "",
             "paragraph": "",
             "s_idx": 12,
             "e_idx": 13,
@@ -331,12 +332,12 @@ class DuReader(object):
                 # skip len(best_paras)=0 samples
                 if len(best_paras) == 0:
                     continue
-                else:
-                    data["paragraph"] = best_paras[0]  # 当前使用单para
-                # find answer span(only for train)
+                # choose best paras and  answer spans
+                data["paragraph"] = choose_one_para(best_paras, sample["segmented_question"], recall)  # 当前使用单para
+                data["paragraphs"] = best_paras  # multiple paras
                 if train:
                     data["fake_answer"], data["s_idx"], data["e_idx"], data["match_score"] \
-                        = find_fake_answer(sample, data["paragraph"])
+                                 = find_fake_answer_from_multi_paras(sample, data["paragraphs"])
                 datas.append(data)
         # write to processed data file
         self.logger.info("processed done! write to file!")

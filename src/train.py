@@ -66,7 +66,7 @@ if __name__ == '__main__':
                         help='path to latest checkpoint (default: None)')
     parser.add_argument('-d', '--device', default=None, type=str,
                         help='indices of GPUs to enable (default: all)')
-    parser.add_argument('-n', '--name', default='MC', type=str,
+    parser.add_argument('-n', '--name', default=None, type=str,
                         help='the path name to save model')
     args = parser.parse_args()
 
@@ -76,8 +76,9 @@ if __name__ == '__main__':
     if args.config:
         # load config file
         config = json.load(open(args.config))
-        config['name'] = args.name
-        path = os.path.join(config['trainer']['save_dir'], config['name'])
+        if args.name:
+            config['name'] = args.name
+        # path = os.path.join(config['trainer']['save_dir'], config['name'])
     elif args.resume:
         # load config file from checkpoint, in case new config file is not given.
         # Use '--config' and '--resume' arguments together to load trained model and train more with changed config.
