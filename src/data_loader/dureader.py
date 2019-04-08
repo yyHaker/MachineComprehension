@@ -22,7 +22,7 @@ class DuReader(object):
         self.logger = logging.getLogger('MC')
         # params
         self.config = config["data_loader"]["args"]
-        # set path (for raw data)
+        # set path (for raw data and processed data(.jsonl))
         data_path = self.config["data_path"]
 
         # get data_path_l (for processed data (.pt))
@@ -39,32 +39,35 @@ class DuReader(object):
         test_examples_path = processed_dataset_path + f'{self.config["test_file"]}.pt'
 
         # judge if need to preprocess raw data files
-        if not os.path.exists(f'{data_path_l}/{self.config["train_file"]}l'):
+        if not os.path.exists(f'{data_path}/{self.config["train_file"]}l'):
             self.logger.info("preprocess train  data...")
-            self.preprocess(f'{data_path_l}/{self.config["train_file"]}')
+            self.preprocess(f'{data_path}/{self.config["train_file"]}')
 
-        if not os.path.exists(f'{data_path_l}/{self.config["dev_file"]}l'):
+        if not os.path.exists(f'{data_path}/{self.config["dev_file"]}l'):
             self.logger.info("preprocess dev  data...")
-            self.preprocess(f'{data_path_l}/{self.config["dev_file"]}')
+            self.preprocess(f'{data_path}/{self.config["dev_file"]}')
 
-        if not os.path.exists(f'{data_path_l}/{self.config["test_file"]}l'):
+        if not os.path.exists(f'{data_path}/{self.config["test_file"]}l'):
             self.logger.info("preprocess test  data...")
-            self.preprocess(f'{data_path_l}/{self.config["test_file"]}', train=False)
+            self.preprocess(f'{data_path}/{self.config["test_file"]}', train=False)
 
         # define Field
         self.logger.info("construct data loader....")
         self.RAW = data.RawField()
         self.RAW.is_target = False     # 读取id值
         self.CHRA_NESTING = data.Field(sequential=True, use_vocab=True, tokenize=list, lower=True)
-        self.CHAR = data.NestedField(self.CHRA_NESTING, use_vocab=True, tokenize=lambda x: x)
+        self.CHAR = data.NestedField(self.CHRA_NESTING, use_vocab=True, tokenize=lambda x: x)      # [b, seq_len, w_len]
         self.WORD = data.Field(sequential=True, use_vocab=True, batch_first=True,
-                               tokenize=lambda x: x, lower=True, include_lengths=True)
+                               tokenize=lambda x: x, lower=False, include_lengths=False)
+        # for multi para  [b, para_num, seq_len] or [b, para_num, seq_len, w_len]
+        self.PARAS = data.NestedField(self.WORD, use_vocab=False, tokenize=lambda x: x, include_lengths=True)
         self.LABEL = data.Field(sequential=False, use_vocab=False, unk_token=None)
 
         dict_fields = {'question_id': ('id', self.RAW),
                        'question': [('q_word', self.WORD), ('q_char', self.CHAR)],
                        'question_type': ('question_type', self.RAW),
                        'paragraph': [('c_word', self.WORD), ('c_char', self.CHAR)],
+                       'paragraphs': ('paras_word', self.PARAS),
                        's_idx': ('s_idx', self.LABEL),
                        'e_idx': ('e_idx', self.LABEL),
                        'yesno_answers': ('yesno_answers', self.RAW)
@@ -72,6 +75,7 @@ class DuReader(object):
 
         list_fields = [('id', self.RAW), ('q_word', self.WORD), ('q_char', self.CHAR),
                        ('question_type', self.RAW), ('c_word', self.WORD), ('c_char', self.CHAR),
+                       ('paras_word', self.PARAS),
                        ('s_idx', self.LABEL), ('e_idx', self.LABEL),
                        ('yesno_answers', self.RAW)
                        ]
@@ -80,11 +84,13 @@ class DuReader(object):
                                    'question': [('q_word', self.WORD), ('q_char', self.CHAR)],
                                    'question_type': ('question_type', self.RAW),
                                    'paragraph': [('c_word', self.WORD), ('c_char', self.CHAR)],
+                                   'paragraphs': ('paras_word', self.PARAS),
                                    'yesno_answers': ('yesno_answers', self.RAW)
                             }
 
         test_list_fields = [('id', self.RAW), ('q_word', self.WORD), ('q_char', self.CHAR),
                        ('question_type', self.RAW), ('c_word', self.WORD), ('c_char', self.CHAR),
+                        ('paras_word', self.PARAS),
                        ('yesno_answers', self.RAW)
                        ]
 
@@ -92,7 +98,7 @@ class DuReader(object):
         if not os.path.exists(train_examples_path) or not os.path.exists(dev_examples_path):
             self.logger.info("build train dataSet....")
             self.train, self.dev = data.TabularDataset.splits(
-                path=data_path_l,
+                path=data_path,
                 train=f'{self.config["train_file"]}l',
                 validation=f'{self.config["dev_file"]}l',
                 format='json',
@@ -113,7 +119,7 @@ class DuReader(object):
         if not os.path.exists(test_examples_path):
             self.logger.info("build test dataSet....")
             self.test = data.TabularDataset(
-                path=os.path.join(data_path_l, f'{self.config["test_file"]}l'),
+                path=os.path.join(data_path, f'{self.config["test_file"]}l'),
                 format='json',
                 fields=test_dict_fields
             )
@@ -293,8 +299,8 @@ class DuReader(object):
             "question_id": "",
             "question": "",
             "question_type": "",
-            "paragraphs": "",
-            "paragraph": "",
+            "paragraphs": "",   # 多个para
+            "paragraph": "",    # 单个para (根据question选)  # no use.
             "s_idx": 12,
             "e_idx": 13,
             "fake_answer": "",
@@ -322,6 +328,8 @@ class DuReader(object):
                     data["yesno_answers"] = sample["yesno_answers"]
                 else:
                     data["yesno_answers"] = []
+                # 过滤sample中paragraphs的非法字符
+                # sample = filter_illegal_words(sample)
                 # find para (for zhidao and search)
                 if "zhidao" in path:
                     best_paras = find_zhidao_paras(sample, train)
