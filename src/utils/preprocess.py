@@ -66,16 +66,15 @@ def find_search_paras(sample, train=True):
     # 选择前三个document
     docs = []
     for doc in sample["documents"]:
-        if train:
-            if doc["is_selected"]:
-                docs.append(doc)
-            else:
-                pass
-        else:
+        if len(doc["segmented_paragraphs"]) != 0:
             docs.append(doc)
     docs = docs[:3]
     for doc in docs:
-        paras = doc["segmented_paragraphs"][:10]
+        paras = []
+        for para in doc["segmented_paragraphs"]:
+            if len(para) != 0:
+                paras.append(para)
+        paras = paras[: 10]
         best_para += doc["segmented_title"]
         best_para += ['<sep>']
         for para in paras:
@@ -164,7 +163,12 @@ def find_search_multi_paras(sample):
         preprocess_docs = []
         for doc in docs:
             preprocess_para = []
-            for para in doc["segmented_paragraphs"][:10]:
+            paras = []
+            for para in doc["segmented_paragraphs"]:
+                if len(para) != 0:
+                    paras.append(para)
+            paras = paras[: 10]
+            for para in paras:
                 preprocess_para += para + ['<sep>']
             preprocess_doc = {
                 'title':doc['segmented_title'],
@@ -179,8 +183,12 @@ def find_search_multi_paras(sample):
             preprocess_para = []
             # 拼title
             preprocess_para += doc["segmented_title"] + ['<sep>']
-            # 仅选取前10个段落
-            paras = doc["segmented_paragraphs"][:10]
+            # 仅选取不为空的前10个段落
+            paras = []
+            for para in doc["segmented_paragraphs"]:
+                if len(para) != 0:
+                    paras.append(para)
+            paras = paras[: 10]
 
             if paras:
                 # 计算Recall
