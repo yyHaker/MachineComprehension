@@ -35,21 +35,21 @@ class DuReader(object):
         ensure_dir(data_path_l)
         processed_dataset_path = data_path_l + "/torchtext/"
         train_examples_path = processed_dataset_path + f'{self.config["train_file"]}.pt'
-        dev_examples_path = processed_dataset_path + f'{self.config["eval_file"]}.pt'
+        dev_examples_path = processed_dataset_path + f'{self.config["dev_file"]}.pt'
         test_examples_path = processed_dataset_path + f'{self.config["test_file"]}.pt'
 
         # judge if need to preprocess raw data files
-        if not os.path.exists(f'{data_path}/{self.config["train_file"]}l'):
+        if not os.path.exists(f'{data_path_l}/{self.config["train_file"]}l'):
             self.logger.info("preprocess train  data...")
-            self.preprocess(f'{data_path}/{self.config["train_file"]}')
+            self.preprocess(f'{data_path_l}/{self.config["train_file"]}')
 
-        if not os.path.exists(f'{data_path}/{self.config["dev_file"]}l'):
+        if not os.path.exists(f'{data_path_l}/{self.config["dev_file"]}l'):
             self.logger.info("preprocess dev  data...")
-            self.preprocess(f'{data_path}/{self.config["dev_file"]}')
+            self.preprocess(f'{data_path_l}/{self.config["dev_file"]}')
 
-        if not os.path.exists(f'{data_path}/{self.config["test_file"]}l'):
+        if not os.path.exists(f'{data_path_l}/{self.config["test_file"]}l'):
             self.logger.info("preprocess test  data...")
-            self.preprocess(f'{data_path}/{self.config["test_file"]}', train=False)
+            self.preprocess(f'{data_path_l}/{self.config["test_file"]}', train=False)
 
         # define Field
         self.logger.info("construct data loader....")
@@ -92,7 +92,7 @@ class DuReader(object):
         if not os.path.exists(train_examples_path) or not os.path.exists(dev_examples_path):
             self.logger.info("build train dataSet....")
             self.train, self.dev = data.TabularDataset.splits(
-                path=data_path,
+                path=data_path_l,
                 train=f'{self.config["train_file"]}l',
                 validation=f'{self.config["dev_file"]}l',
                 format='json',
@@ -113,7 +113,7 @@ class DuReader(object):
         if not os.path.exists(test_examples_path):
             self.logger.info("build test dataSet....")
             self.test = data.TabularDataset(
-                path=os.path.join(data_path, f'{self.config["test_file"]}l'),
+                path=os.path.join(data_path_l, f'{self.config["test_file"]}l'),
                 format='json',
                 fields=test_dict_fields
             )
