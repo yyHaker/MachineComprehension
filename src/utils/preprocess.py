@@ -21,8 +21,9 @@ def find_fake_answer_from_multi_paras(sample, paragraphs):
     best_s_idx = 0
     best_e_idx = 0
     best_score = 0.
+    best_para_idx = -1
     best_para = []  # not return
-    for para in paragraphs:
+    for para_idx, para in enumerate(paragraphs):
         fake_answer, s_idx, e_idx, score = find_fake_answer_2(sample, para)
         if score > best_score:
             best_score = score
@@ -30,10 +31,11 @@ def find_fake_answer_from_multi_paras(sample, paragraphs):
             best_s_idx = s_idx
             best_e_idx = e_idx
             best_para = para
+            best_para_idx = para_idx
     # print("answer match score: ", best_score)
     # make sure answer span is in one of the para and match score is not zero
     # assert _check_ans_span(best_para, best_s_idx, best_e_idx, best_score) is True
-    return best_fake_answer, best_s_idx, best_e_idx, best_score
+    return best_fake_answer, best_s_idx, best_e_idx, best_score, best_para_idx
 
 
 def find_search_paras(sample, train=True):
