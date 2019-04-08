@@ -70,9 +70,40 @@ def ensure_dir(path):
         os.makedirs(path)
 
 
+def split_list(alist, word):
+    """
+    split list into lists according to one word.
+    :param alist:
+    :param word:
+    :return:
+    ---------
+    Example:
+    >>>a = ["a", "sep", "b", "c", "<sep>", "hjlo", "Hi"]
+    >>>split_list(a, "<sep>")
+    >>>[ ["a"], ["b", "c"], ["hjlo", "hi"] ]
+    >>>b = ["a", "sep", "b", "c", "<sep>", "hjlo", "Hi", "sep"]
+    >>>split_list(b, "sep")
+    >>>[ ["a"], ["b", "c"], ["<hjlo>", "hi"] ]
+    """
+    relative_pos = 0
+    res = []
+    for i in range(len(alist)):
+        if alist[i] == word:
+            res.append(alist[relative_pos: i])
+            relative_pos = i + 1
+        elif i == len(alist) - 1 and relative_pos != len(alist) - 1:
+            res.append(alist[relative_pos:])
+            break
+    return res
+
+
 if __name__ == "__main__":
     text = "I like playing computer games."
     sent = "I want to watch tv in living room"
     text2 = "网站赌博输钱报警有吗"
     print(CN_tokenizer(text2))
     print(tokenizer(sent))
+
+    a = ["a", "<sep>", "b", "c", "<sep>", "hjlo", "Hi", "<sep>"]
+    res = split_list(a, "<sep>")
+    print(res)

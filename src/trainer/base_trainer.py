@@ -12,6 +12,7 @@ import json
 import logging
 import math
 import os
+import fnmatch
 
 import torch
 from utils import ensure_dir
@@ -62,11 +63,11 @@ class BaseTrainer(object):
         self.log_step = config['trainer']['log_step']
 
         # setup directory for checkpoint saving
-        start_time = datetime.datetime.now().strftime('%m%d_%H%M%S')
-        self.checkpoint_dir = os.path.join(config['trainer']['save_dir'], config['name'], start_time)
+        # start_time = datetime.datetime.now().strftime('%m%d_%H%M%S')
+        self.checkpoint_dir = os.path.join(config['trainer']['save_dir'], config['arch']['type'], config["name"])
 
         # setup visualization writer instance
-        writer_dir = os.path.join(config['visualization']['log_dir'], config['name'], start_time)
+        writer_dir = os.path.join(config['visualization']['log_dir'], config['arch']['type'], config["name"])
         self.writer = SummaryWriter(log_dir=writer_dir)
 
         # Save configuration file into checkpoint directory:
@@ -172,6 +173,11 @@ class BaseTrainer(object):
             'monitor_best': self.monitor_best,
             'config': self.config
         }
+        # delete history best model
+        for file in os.listdir(self.checkpoint_dir):
+            if fnmatch.fnmatch(file, 'model_best_Rouge_*.pth'):
+                os.remove(os.path.join(self.checkpoint_dir, file))
+        # save current best model
         best_path = os.path.join(self.checkpoint_dir, 'model_best_Rouge_{}.pth'.format(self.monitor_best))
         torch.save(state, best_path)
         self.logger.info("Saving current best: {} ...".format('model_best_Rouge_{}.pth'.format(self.monitor_best)))
