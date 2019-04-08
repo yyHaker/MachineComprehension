@@ -163,18 +163,18 @@ def find_search_multi_paras(sample):
         preprocess_docs = []
         for doc in docs:
             preprocess_para = []
+            # 拼title
+            preprocess_para += doc["segmented_title"] + ['<sep>']
+            # 仅选取不为空的最多前10个段落
             paras = []
             for para in doc["segmented_paragraphs"]:
                 if len(para) != 0:
                     paras.append(para)
             paras = paras[: 10]
+            # 拼接段落
             for para in paras:
                 preprocess_para += para + ['<sep>']
-            preprocess_doc = {
-                'title':doc['segmented_title'],
-                'paragraph':preprocess_para
-            }
-            preprocess_docs.append(preprocess_doc)
+            preprocess_docs.append(preprocess_para)
         return preprocess_docs
     else:
         preprocess_docs = []

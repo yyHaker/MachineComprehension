@@ -15,19 +15,6 @@ sys.path.append(os.getcwd())
 from utils import *
 
 
-def first_sentence(para):
-    if not len(para):
-        return []
-    split_tag = ['。', '!', '?', '！', '？']
-    s = []
-    for word in para:
-        s.append(word)
-        if word in split_tag:
-            break
-    if s[-1] not in split_tag:
-        s.append('。')
-    return s
-
 
 def preprocessd(path, save_path, train=True):
     """preprocess the process data to a list of dict. (own preprocess method)

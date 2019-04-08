@@ -9,39 +9,12 @@
 
 # 处理Search文件，输入官方预处理文件，输出改进的预处理文件
 """
-
+import os
+import sys
+# add current path to sys path
+sys.path.append(os.getcwd())
 from utils import *
-from utils.preprocess import find_search_multi_paras, find_search_paras
-
-
-def _find_fake_answer(sample, paragraph):
-    """find paragraph and fake answer for one sample.
-    :param samlpe:
-    :param paragraph:
-    :return:
-    """
-    best_para = paragraph
-    # get answer tokens
-    answer_tokens = set()
-    for segmented_answer in sample["segmented_answers"]:
-        answer_tokens = answer_tokens | set([token for token in segmented_answer])
-    # choose answer span
-    best_start_idx = 0
-    best_end_idx = 0
-    best_score = 0.
-    for start_idx in range(len(best_para)):
-        if best_para[start_idx] not in answer_tokens:
-            continue  # speed the preprocess
-        for end_idx in range(start_idx, len(best_para)):
-            span_string = best_para[start_idx: end_idx + 1]
-            F1_score = metric_max_over_ground_truths(f1_score, span_string, sample["segmented_answers"])
-            if F1_score > best_score:
-                best_score = F1_score
-                best_start_idx = start_idx
-                best_end_idx = end_idx
-                if F1_score == 1.0:
-                    return best_para[best_start_idx: best_end_idx + 1], best_start_idx, best_end_idx, best_score
-    return best_para[best_start_idx: best_end_idx + 1], best_start_idx, best_end_idx, best_score
+from utils.preprocess import find_search_multi_paras, find_search_paras, find_fake_answer
 
 
 def preprocessd(path, save_path, train=True):
@@ -106,7 +79,7 @@ def preprocessd(path, save_path, train=True):
             # find answer span
             if train:
                 data["fake_answer"], data["s_idx"], data["e_idx"], data["match_score"] \
-                    = _find_fake_answer(sample, data["paragraph"])
+                    = find_fake_answer(sample, data["paragraph"])
             datas.append(data)
     # write to processed data file
     print("processed done! write to file!")
@@ -141,14 +114,12 @@ def preprocessd_multi_para(path, save_path, train=True):
             else:
                 data["yesno_answers"] = []
             # find para
-            data["preprocessed_docs"] = find_search_multi_paras(sample)
-            for doc in data["preprocessed_docs"]:
-                paras = doc.split('<sep>')[1:]
+            data["paragraphs"] = find_search_multi_paras(sample)
 
             # # find answer span
-            # if train:
-            #     data["fake_answer"], data["s_idx"], data["e_idx"], data["match_score"] \
-            #         = _find_fake_answer(sample, data["paragraph"])
+            if train:
+                data["fake_answer"], data["s_idx"], data["e_idx"], data["match_score"], data["answer_para_idx"] \
+                    = find_fake_answer_from_multi_paras(sample, data["paragraphs"])
             datas.append(data)
     # write to processed data file
     print("processed done! write to file!")
