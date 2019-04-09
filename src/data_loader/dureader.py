@@ -39,17 +39,17 @@ class DuReader(object):
         test_examples_path = processed_dataset_path + f'{self.config["test_file"]}.pt'
 
         # judge if need to preprocess raw data files
-        if not os.path.exists(f'{data_path}/{self.config["train_file"]}l'):
+        if not os.path.exists(f'{data_path_l}/{self.config["train_file"]}l'):
             self.logger.info("preprocess train  data...")
-            self.preprocess(f'{data_path}/{self.config["train_file"]}')
+            self.preprocess(f'{data_path_l}/{self.config["train_file"]}')
 
-        if not os.path.exists(f'{data_path}/{self.config["dev_file"]}l'):
+        if not os.path.exists(f'{data_path_l}/{self.config["dev_file"]}l'):
             self.logger.info("preprocess dev  data...")
-            self.preprocess(f'{data_path}/{self.config["dev_file"]}')
+            self.preprocess(f'{data_path_l}/{self.config["dev_file"]}')
 
-        if not os.path.exists(f'{data_path}/{self.config["test_file"]}l'):
+        if not os.path.exists(f'{data_path_l}/{self.config["test_file"]}l'):
             self.logger.info("preprocess test  data...")
-            self.preprocess(f'{data_path}/{self.config["test_file"]}', train=False)
+            self.preprocess(f'{data_path_l}/{self.config["test_file"]}', train=False)
 
         # define Field
         self.logger.info("construct data loader....")
@@ -64,41 +64,49 @@ class DuReader(object):
         self.LABEL = data.Field(sequential=False, use_vocab=False, unk_token=None)
 
         dict_fields = {'question_id': ('id', self.RAW),
-                       'question': [('q_word', self.WORD), ('q_char', self.CHAR)],
+                       # 'question': [('q_word', self.WORD), ('q_char', self.CHAR)],
+                       'question': ('q_word', self.WORD),
                        'question_type': ('question_type', self.RAW),
-                       'paragraph': [('c_word', self.WORD), ('c_char', self.CHAR)],
+                       # 'paragraph': [('c_word', self.WORD), ('c_char', self.CHAR)],
                        'paragraphs': ('paras_word', self.PARAS),
                        's_idx': ('s_idx', self.LABEL),
                        'e_idx': ('e_idx', self.LABEL),
-                       'yesno_answers': ('yesno_answers', self.RAW)
+                       'yesno_answers': ('yesno_answers', self.RAW),
+                       'answer_para_idx': ('answer_para_idx', self.LABEL)
         }
 
-        list_fields = [('id', self.RAW), ('q_word', self.WORD), ('q_char', self.CHAR),
-                       ('question_type', self.RAW), ('c_word', self.WORD), ('c_char', self.CHAR),
+        list_fields = [('id', self.RAW), ('q_word', self.WORD),
+                       # ('q_char', self.CHAR),
+                       ('question_type', self.RAW),
+                       # ('c_word', self.WORD), ('c_char', self.CHAR),
                        ('paras_word', self.PARAS),
                        ('s_idx', self.LABEL), ('e_idx', self.LABEL),
-                       ('yesno_answers', self.RAW)
+                       ('yesno_answers', self.RAW),
+                       ('answer_para_idx', self.LABEL)
                        ]
 
         test_dict_fields = {'question_id': ('id', self.RAW),
-                                   'question': [('q_word', self.WORD), ('q_char', self.CHAR)],
-                                   'question_type': ('question_type', self.RAW),
-                                   'paragraph': [('c_word', self.WORD), ('c_char', self.CHAR)],
-                                   'paragraphs': ('paras_word', self.PARAS),
-                                   'yesno_answers': ('yesno_answers', self.RAW)
+                            # 'question': [('q_word', self.WORD), ('q_char', self.CHAR)],
+                            'question': ('q_word', self.WORD),
+                            'question_type': ('question_type', self.RAW),
+                            # 'paragraph': [('c_word', self.WORD), ('c_char', self.CHAR)],
+                            'paragraphs': ('paras_word', self.PARAS),
+                            'yesno_answers': ('yesno_answers', self.RAW),
                             }
 
-        test_list_fields = [('id', self.RAW), ('q_word', self.WORD), ('q_char', self.CHAR),
-                       ('question_type', self.RAW), ('c_word', self.WORD), ('c_char', self.CHAR),
-                        ('paras_word', self.PARAS),
-                       ('yesno_answers', self.RAW)
-                       ]
+        test_list_fields = [('id', self.RAW), ('q_word', self.WORD),
+                            # ('q_char', self.CHAR),
+                            ('question_type', self.RAW),
+                            # ('c_word', self.WORD), ('c_char', self.CHAR),
+                            ('paras_word', self.PARAS),
+                            ('yesno_answers', self.RAW)
+                            ]
 
         # judge if need to build dataSet
         if not os.path.exists(train_examples_path) or not os.path.exists(dev_examples_path):
             self.logger.info("build train dataSet....")
             self.train, self.dev = data.TabularDataset.splits(
-                path=data_path,
+                path=data_path_l,
                 train=f'{self.config["train_file"]}l',
                 validation=f'{self.config["dev_file"]}l',
                 format='json',
@@ -119,7 +127,7 @@ class DuReader(object):
         if not os.path.exists(test_examples_path):
             self.logger.info("build test dataSet....")
             self.test = data.TabularDataset(
-                path=os.path.join(data_path, f'{self.config["test_file"]}l'),
+                path=os.path.join(data_path_l, f'{self.config["test_file"]}l'),
                 format='json',
                 fields=test_dict_fields
             )
@@ -133,7 +141,7 @@ class DuReader(object):
 
         # build vocab
         self.logger.info("build vocab....")
-        self.CHAR.build_vocab(self.train, self.dev)
+        # self.CHAR.build_vocab(self.train, self.dev)
         self.WORD.build_vocab(self.train, self.dev)
 
         # load pretrained embeddings
@@ -146,16 +154,16 @@ class DuReader(object):
         self.logger.info("building iterators....")
         self.train_iter, self.eval_iter = data.BucketIterator.splits(datasets=(self.train, self.dev),
                                                                      batch_sizes=[self.config["train_batch_size"], self.config["dev_batch_size"]],
-                                                                     sort_key=lambda x: len(x.c_word),
-                                                                     sort_within_batch=True,
+                                                                     # sort_key=lambda x: len(x.c_word),
+                                                                     # sort_within_batch=True,
                                                                      device=self.config["device"],
                                                                      shuffle=True)
         self.test_iter = data.BucketIterator(dataset=self.test,
-                                            batch_size=4,
-                                            sort_key=lambda x: len(x.c_word),
-                                            sort_within_batch=True,
-                                            device=self.config["device"],
-                                            shuffle=False)
+                                             batch_size=4,
+                                             # sort_key=lambda x: len(x.c_word),
+                                             # sort_within_batch=True,
+                                             device=self.config["device"],
+                                             shuffle=False)
 
     def preprocess(self, path, train=True):
         """
@@ -334,7 +342,7 @@ class DuReader(object):
                 if "zhidao" in path:
                     best_paras = find_zhidao_paras(sample, train)
                 elif "search" in path:
-                    best_paras = find_search_paras(sample, train)
+                    best_paras = find_search_paras(sample)
                 else:
                     raise Exception("not supported data processing!")
                 # skip len(best_paras)=0 samples
@@ -344,9 +352,10 @@ class DuReader(object):
                 data["paragraph"] = choose_one_para(best_paras, sample["segmented_question"], recall)  # 当前使用单para
                 data["paragraphs"] = best_paras  # multiple paras
                 if train:
-                    data["fake_answer"], data["s_idx"], data["e_idx"], data["match_score"] \
-                                 = find_fake_answer_from_multi_paras(sample, data["paragraphs"])
-                datas.append(data)
+                    data["fake_answer"], data["s_idx"], data["e_idx"], data["match_score"], data["answer_para_idx"] \
+                        = find_fake_answer_from_multi_paras(sample, data["paragraphs"])
+                if not train or data['match_score'] != 0:
+                    datas.append(data)
         # write to processed data file
         self.logger.info("processed done! write to file!")
         with codecs.open(f'{path}l', "w", encoding="utf-8") as f_out:
