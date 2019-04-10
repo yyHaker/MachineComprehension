@@ -22,34 +22,39 @@ class DuReader(object):
         self.logger = logging.getLogger('MC')
         # params
         self.config = config["data_loader"]["args"]
-        # set path (for raw data and processed data(.jsonl))
+        # set path (for raw data)
         data_path = self.config["data_path"]
 
-        # get data_path_l (for processed data (.pt))
+        # get data_path_l (for processed data (.jsonl and .pt))
         if "search" in self.config["train_file"]:
-            data_path_l = os.path.join(data_path, "search")
+            data_path_process = os.path.join(data_path, "search")
         elif "zhidao" in self.config["train_file"]:
-            data_path_l = os.path.join(data_path, "zhidao")
+            data_path_process = os.path.join(data_path, "zhidao")
         else:
             raise Exception("not supported data set now!")
-        ensure_dir(data_path_l)
-        processed_dataset_path = data_path_l + "/torchtext/"
+        data_path_process = os.path.join(data_path_process, self.config["process_info"])
+        ensure_dir(data_path_process)
+        # (for .pt)
+        processed_dataset_path = data_path_process + "/torchtext/"
         train_examples_path = processed_dataset_path + f'{self.config["train_file"]}.pt'
         dev_examples_path = processed_dataset_path + f'{self.config["dev_file"]}.pt'
         test_examples_path = processed_dataset_path + f'{self.config["test_file"]}.pt'
 
         # judge if need to preprocess raw data files
-        if not os.path.exists(f'{data_path}/{self.config["train_file"]}l'):
+        if not os.path.exists(f'{data_path_process}/{self.config["train_file"]}l'):
             self.logger.info("preprocess train  data...")
-            self.preprocess(f'{data_path}/{self.config["train_file"]}')
+            self.preprocess(f'{data_path}/{self.config["train_file"]}',
+                            save_path=f'{data_path_process}/{self.config["train_file"]}l')
 
-        if not os.path.exists(f'{data_path}/{self.config["dev_file"]}l'):
+        if not os.path.exists(f'{data_path_process}/{self.config["dev_file"]}l'):
             self.logger.info("preprocess dev  data...")
-            self.preprocess(f'{data_path}/{self.config["dev_file"]}')
+            self.preprocess(f'{data_path}/{self.config["dev_file"]}',
+                            save_path=f'{data_path_process}/{self.config["dev_file"]}l')
 
-        if not os.path.exists(f'{data_path}/{self.config["test_file"]}l'):
+        if not os.path.exists(f'{data_path_process}/{self.config["test_file"]}l'):
             self.logger.info("preprocess test  data...")
-            self.preprocess(f'{data_path}/{self.config["test_file"]}', train=False)
+            self.preprocess(f'{data_path}/{self.config["test_file"]}',
+                            save_path=f'{data_path_process}/{self.config["test_file"]}l', train=False)
 
         # define Field
         self.logger.info("construct data loader....")
@@ -98,7 +103,7 @@ class DuReader(object):
         if not os.path.exists(train_examples_path) or not os.path.exists(dev_examples_path):
             self.logger.info("build train dataSet....")
             self.train, self.dev = data.TabularDataset.splits(
-                path=data_path,
+                path=f'{data_path_process}',
                 train=f'{self.config["train_file"]}l',
                 validation=f'{self.config["dev_file"]}l',
                 format='json',
@@ -119,7 +124,7 @@ class DuReader(object):
         if not os.path.exists(test_examples_path):
             self.logger.info("build test dataSet....")
             self.test = data.TabularDataset(
-                path=os.path.join(data_path, f'{self.config["test_file"]}l'),
+                path=f'{data_path_process}/{self.config["test_file"]}l',
                 format='json',
                 fields=test_dict_fields
             )
@@ -157,26 +162,28 @@ class DuReader(object):
                                             device=self.config["device"],
                                             shuffle=False)
 
-    def preprocess(self, path, train=True):
+    def preprocess(self, path, save_path, train=True):
         """
         read preprocessed data or pre preprocessed data.
         :param path:
+        :param save_path:
         :param train:
         :return:
         """
         if "v1.0" in self.config["data_path"]:
             self.logger.info("read processed data...")
-            self.read_preprocess(path, train=train)
+            self.read_preprocess(path, save_path, train=train)
         elif "v2.0" in self.config["data_path"]:
             self.logger.info("pre preprocessed data...")
-            self.pre_preprocess(path, train=train)
+            self.pre_preprocess(path, save_path, train=train)
 
-    def read_preprocess(self, path, train=True):
+    def read_preprocess(self, path, save_path, train=True):
         """preprocess the process data to a list of dict. (just read)
             1. 使用预先处理的已经分词的数据
             2. 使用一个sample的处理之后字段
         ----------
         :param path:
+        :param save_path:
         :return:
         (文本均是分词后的结果)
          train_d = {
@@ -266,12 +273,12 @@ class DuReader(object):
                 datas.append(data)
         # write to processed data file
         self.logger.info("processed done! write to file!")
-        with codecs.open(f'{path}l', "w", encoding="utf-8") as f_out:
+        with codecs.open(save_path, "w", encoding="utf-8") as f_out:
             for line in datas:
                 json.dump(line, f_out, ensure_ascii=False)
                 print("", file=f_out)
 
-    def pre_preprocess(self, path, train=True):
+    def pre_preprocess(self, path, save_path, train=True):
         """preprocess the process data to a list of dict. (own preprocess method)
             1. 使用预先处理的已经分词的数据
             2. 使用一个sample的字段有：
@@ -305,7 +312,8 @@ class DuReader(object):
             "e_idx": 13,
             "fake_answer": "",
             "yesno_answers": "",
-            "match_score": 0.8  # the F1 of fake_answer and true answer
+            "match_score": 0.8 , # the F1 of fake_answer and true answer
+            "para_idx": 3
         }  # 训练一个找answer span的模型 + 判断yes_no, 可测试时候怎么做？
         """
         # read process data.
@@ -329,7 +337,7 @@ class DuReader(object):
                 else:
                     data["yesno_answers"] = []
                 # 过滤sample中paragraphs的非法字符
-                # sample = filter_illegal_words(sample)
+                sample = filter_illegal_words(sample)
                 # find para (for zhidao and search)
                 if "zhidao" in path:
                     best_paras = find_zhidao_paras(sample, train)
@@ -341,15 +349,17 @@ class DuReader(object):
                 if len(best_paras) == 0:
                     continue
                 # choose best paras and  answer spans
-                data["paragraph"] = choose_one_para(best_paras, sample["segmented_question"], recall)  # 当前使用单para
+                # data["paragraph"] = choose_one_para(best_paras, sample["segmented_question"], recall)  # 当前使用单para
                 data["paragraphs"] = best_paras  # multiple paras
                 if train:
-                    data["fake_answer"], data["s_idx"], data["e_idx"], data["match_score"] \
-                                 = find_fake_answer_from_multi_paras(sample, data["paragraphs"])
+                    data["fake_answer"], data["s_idx"], data["e_idx"], data["match_score"], data["answer_para_idx"] \
+                        = find_fake_answer_from_multi_paras(sample, data["paragraphs"])
+                # for paragraphs post_process(just for torchText easy to use)
+                data["paragraphs"] = post_process_paras(best_paras, max_len=3)
                 datas.append(data)
         # write to processed data file
         self.logger.info("processed done! write to file!")
-        with codecs.open(f'{path}l', "w", encoding="utf-8") as f_out:
+        with codecs.open(save_path, "w", encoding="utf-8") as f_out:
             for line in datas:
                 json.dump(line, f_out, ensure_ascii=False)
                 print("", file=f_out)

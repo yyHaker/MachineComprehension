@@ -7,7 +7,8 @@
 @file: preprocess.py
 @time: 2019/4/5 16:07
 """
-from utils import metric_max_over_ground_truths, f1_score, recall, split_list, precision_recall_f1
+from utils import *
+from .filter import IllegalWords
 
 
 def find_fake_answer_from_multi_paras(sample, paragraphs):
@@ -338,26 +339,6 @@ def _find_answer_span_from_one_para(para, answer_tokens, ref_answers):
         return best_start_idx, best_end_idx, best_score
 
 
-def _check_ans_span(paragraph, best_start_idx, best_end_idx, best_score):
-    """make sure answer span is in one of the para and match score is not zero
-    :param paragraph:
-    :param best_start_idx:
-    :param best_end_idx:
-    :param best_score:
-    :return:
-    """
-    best_para = paragraph
-    paras_list = split_list(best_para, "<sep>")
-    title = paras_list[0]
-    paras = paras_list[1:]  # answer not in title
-    exists = False
-    for para in paras:
-        if "".join(paragraph[best_start_idx: best_end_idx+1]) in "".join(para):
-            exists = True
-            break
-    return exists and best_score > 0
-
-
 def find_fake_answer(sample, paragraph):
     """find paragraph and fake answer for one sample.
     :param sample:
@@ -386,3 +367,41 @@ def find_fake_answer(sample, paragraph):
                 if F1_score == 1.0:
                     return best_para[best_start_idx: best_end_idx+1], best_start_idx, best_end_idx, best_score
     return best_para[best_start_idx: best_end_idx+1], best_start_idx, best_end_idx, best_score
+
+
+def _check_ans_span(paragraph, best_start_idx, best_end_idx, best_score):
+    """make sure answer span is in one of the para and match score is not zero
+    :param paragraph:
+    :param best_start_idx:
+    :param best_end_idx:
+    :param best_score:
+    :return:
+    """
+    best_para = paragraph
+    paras_list = split_list(best_para, "<sep>")
+    title = paras_list[0]
+    paras = paras_list[1:]  # answer not in title
+    exists = False
+    for para in paras:
+        if "".join(paragraph[best_start_idx: best_end_idx+1]) in "".join(para):
+            exists = True
+            break
+    return exists and best_score > 0
+
+
+def filter_illegal_words(sample):
+    """
+    filter illegal words.
+    :param sample:
+    :return:
+    """
+    illegal = IllegalWords()
+    for idx, doc in enumerate(sample["documents"]):
+        res_paras = []
+        for para in doc["segmented_paragraphs"]:
+            para = [w for w in para if w not in illegal.illegal_words]
+            if len(para) != 0:
+                res_paras.append(para)
+        sample["documents"][idx]["segmented_paragraphs"] = res_paras
+    return sample
+

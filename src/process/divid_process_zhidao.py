@@ -15,7 +15,6 @@ sys.path.append(os.getcwd())
 from utils import *
 
 
-
 def preprocessd(path, save_path, train=True):
     """preprocess the process data to a list of dict. (own preprocess method)
         1. 使用预先处理的已经分词的数据
@@ -50,6 +49,7 @@ def preprocessd(path, save_path, train=True):
         "fake_answer": "",
         "yesno_answers": "",
         "match_score": 0.8  # the F1 of fake_answer and true answer
+        "answer_para_idx"
     }  # 训练一个找answer span的模型 + 判断yes_no, 可测试时候怎么做？
     """
     # read process data
@@ -73,6 +73,8 @@ def preprocessd(path, save_path, train=True):
                 data["yesno_answers"] = sample["yesno_answers"]
             else:
                 data["yesno_answers"] = []
+            # 过滤sample中paragraphs的非法字符
+            sample = filter_illegal_words(sample)
             # find para (for zhidao and search)
             if "zhidao" in path:
                 best_paras = find_zhidao_paras(sample, train)
@@ -86,8 +88,10 @@ def preprocessd(path, save_path, train=True):
             data["paragraph"] = choose_one_para(best_paras, sample["segmented_question"], recall)  # 当前使用单para
             data["paragraphs"] = best_paras  # multiple paras
             if train:
-                data["fake_answer"], data["s_idx"], data["e_idx"], data["match_score"] \
+                data["fake_answer"], data["s_idx"], data["e_idx"], data["match_score"], data["answer_para_idx"] \
                     = find_fake_answer_from_multi_paras(sample, data["paragraphs"])
+            # for paragraphs post_process(just for torchText easy to use)
+            data["paragraphs"] = post_process_paras(best_paras, max_len=3)
             datas.append(data)
     # write to processed data file
     ensure_dir(os.path.split(save_path)[0])

@@ -179,7 +179,6 @@ class BiDAF(nn.Module):
             p2 = (self.p2_weight_g(g) + self.p2_weight_m(m2)).squeeze()
             return p1, p2
 
-
         # 1. Character Embedding Layer
         # c_char = char_emb_layer(batch.c_char)
         # q_char = char_emb_layer(batch.q_char)
@@ -194,9 +193,11 @@ class BiDAF(nn.Module):
         q = highway_network(q_word)
         # print('Highway:', c.shape, q.shape)
         # 3. Contextual Embedding Layer
+        print("c: ", c.shape, "c_len : ", c_lens.shape)
+        print("q: ", q.shape, "q_len : ", q_lens.shape)
         c = self.context_LSTM((c, c_lens))[0]
         q = self.context_LSTM((q, q_lens))[0]
-        # print('Contextual:', c.shape, q.shape)
+        print('Contextual:', c.shape, q.shape)
         # 4. Attention Flow Layer
         g = att_flow_layer(c, q)
         # 5. Modeling Layer
