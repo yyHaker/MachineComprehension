@@ -71,7 +71,12 @@ class Trainer(BaseTrainer):
         for batch_idx, data in enumerate(self.data_loader.train_iter):
             p1, p2 = self.model(data)
             self.optimizer.zero_grad()
-            loss = self.loss(p1, data.s_idx) + self.loss(p2, data.e_idx)
+            # 计算s_idx, e_idx在多个para连接时的绝对值
+            max_p_len = data.paras_word[0].shape[2]
+            s_idx = data.s_idx + data.answer_para_idx * max_p_len
+            e_idx = data.e_idx + data.answer_para_idx * max_p_len
+
+            loss = self.loss(p1, s_idx) + self.loss(p2, e_idx)
             loss.backward()
             self.optimizer.step()
 
