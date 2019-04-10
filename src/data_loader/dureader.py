@@ -59,13 +59,15 @@ class DuReader(object):
         self.CHAR = data.NestedField(self.CHRA_NESTING, use_vocab=True, tokenize=lambda x: x)      # [b, seq_len, w_len]
         self.WORD = data.Field(sequential=True, use_vocab=True, batch_first=True,
                                tokenize=lambda x: x, lower=False, include_lengths=False)
+        self.Q_WORD = data.Field(sequential=True, use_vocab=True, batch_first=True,
+                                 tokenize=lambda x: x, lower=False, include_lengths=True)
         # for multi para  [b, para_num, seq_len] or [b, para_num, seq_len, w_len]
-        self.PARAS = data.NestedField(self.WORD, use_vocab=False, tokenize=lambda x: x, include_lengths=True)
+        self.PARAS = data.NestedField(self.WORD, use_vocab=True, tokenize=lambda x: x, include_lengths=True)
         self.LABEL = data.Field(sequential=False, use_vocab=False, unk_token=None)
 
         dict_fields = {'question_id': ('id', self.RAW),
                        # 'question': [('q_word', self.WORD), ('q_char', self.CHAR)],
-                       'question': ('q_word', self.WORD),
+                       'question': ('q_word', self.Q_WORD),
                        'question_type': ('question_type', self.RAW),
                        # 'paragraph': [('c_word', self.WORD), ('c_char', self.CHAR)],
                        'paragraphs': ('paras_word', self.PARAS),
@@ -75,7 +77,7 @@ class DuReader(object):
                        'answer_para_idx': ('answer_para_idx', self.LABEL)
         }
 
-        list_fields = [('id', self.RAW), ('q_word', self.WORD),
+        list_fields = [('id', self.RAW), ('q_word', self.Q_WORD),
                        # ('q_char', self.CHAR),
                        ('question_type', self.RAW),
                        # ('c_word', self.WORD), ('c_char', self.CHAR),
@@ -87,14 +89,14 @@ class DuReader(object):
 
         test_dict_fields = {'question_id': ('id', self.RAW),
                             # 'question': [('q_word', self.WORD), ('q_char', self.CHAR)],
-                            'question': ('q_word', self.WORD),
+                            'question': ('q_word', self.Q_WORD),
                             'question_type': ('question_type', self.RAW),
                             # 'paragraph': [('c_word', self.WORD), ('c_char', self.CHAR)],
                             'paragraphs': ('paras_word', self.PARAS),
                             'yesno_answers': ('yesno_answers', self.RAW),
                             }
 
-        test_list_fields = [('id', self.RAW), ('q_word', self.WORD),
+        test_list_fields = [('id', self.RAW), ('q_word', self.Q_WORD),
                             # ('q_char', self.CHAR),
                             ('question_type', self.RAW),
                             # ('c_word', self.WORD), ('c_char', self.CHAR),
@@ -142,13 +144,15 @@ class DuReader(object):
         # build vocab
         self.logger.info("build vocab....")
         # self.CHAR.build_vocab(self.train, self.dev)
-        self.WORD.build_vocab(self.train, self.dev)
+        self.PARAS.build_vocab(self.train.paras_word, self.train.q_word, self.dev.paras_word, self.dev.q_word)
+        self.Q_WORD.vocab = self.PARAS.vocab
 
         # load pretrained embeddings
         Vectors = vocab.Vectors(self.config["pretrain_emd_file"])
-        self.WORD.vocab.load_vectors(Vectors)
+        self.PARAS.vocab.load_vectors(Vectors)
+
         # just for call easy
-        self.vocab_vectors = self.WORD.vocab.vectors
+        self.vocab_vectors = self.PARAS.vocab.vectors
 
         # build iterators
         self.logger.info("building iterators....")
