@@ -94,8 +94,8 @@ def find_search_paras(sample):
             for para in paras:
                 preprocess_para += para + ['<sep>']
             preprocess_para = preprocess_para[:500]
+            preprocess_para += ['<eop>']
             preprocess_docs.append(preprocess_para)
-        return preprocess_docs
     else:
         preprocess_docs = []
         question = sample['segmented_question']
@@ -129,8 +129,12 @@ def find_search_paras(sample):
                     if i != early_idx and i != early_next_idx:
                         preprocess_para += first_sentence(paras[i[0]]) + ['<sep>']
                 preprocess_para = preprocess_para[:500]
+                preprocess_para += ['<eop>']
                 preprocess_docs.append(preprocess_para)
-        return preprocess_docs
+    # 对para数量不足3的，直接加入<eop>
+    for i in range(3 - len(preprocess_docs)):
+        preprocess_docs.append(['<eop>'])
+    return preprocess_docs
 
 
 def find_zhidao_paras(sample, train=True):
