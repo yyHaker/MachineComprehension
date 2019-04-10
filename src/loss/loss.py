@@ -10,23 +10,23 @@
 import torch
 
 
-# def cross_entropy(output, target):
-#     """
-#     cross entropy loss.
-#     :param output:
-#     :param target:
-#     :return:
-#     """
-#     loss = torch.nn.CrossEntropyLoss()
-#     return loss(output, target)
-
-
-def nll_loss(output, target):
+def cross_entropy(output, target):
     """
     cross entropy loss.
-    :param output: the nagtive log prob of each class idx
-    :param target: class idx
+    :param output:
+    :param target:
     :return:
     """
-    loss = torch.nn.NLLLoss()
+    loss = torch.nn.CrossEntropyLoss()
     return loss(output, target)
+
+
+# def nll_loss(output, target):
+#     """
+#     cross entropy loss.
+#     :param output: the nagtive log prob of each class idx
+#     :param target: class idx
+#     :return:
+#     """
+#     loss = torch.nn.NLLLoss()
+#     return loss(output, target)
