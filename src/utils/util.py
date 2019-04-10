@@ -13,6 +13,7 @@ import spacy
 import codecs
 import nltk
 import jieba
+import torch
 
 spacy_en = spacy.load('en')
 
@@ -95,6 +96,40 @@ def split_list(alist, word):
             res.append(alist[relative_pos:])
             break
     return res
+
+
+def seq_mask(seq_len, device, max_len=None):
+    '''
+    :param seq_len:
+    :param device:
+    :param max_len:
+    :return: mask matrix
+    '''
+    batch_size = seq_len.size(0)
+    if not max_len:
+        max_len = torch.max(seq_len)
+    mask = torch.zeros((batch_size, max_len), device=device)
+    for i in range(batch_size):
+        for j in range(seq_len[i]):
+            mask[i][j] = 1
+    return mask
+
+
+def log_softmax_mask(A, mask, dim=1, epsilon=1e-12):
+    '''
+    applay log_softmax on A and consider mask
+    :param A:
+    :param mask:
+    :param dim:
+    :param epsilon:
+    :return:
+    '''
+    # According to https://discuss.pytorch.org/t/apply-mask-softmax/14212/7
+    A_max = torch.max(A, dim=dim, keepdim=True)[0]
+    A_exp = torch.exp(A - A_max)
+    A_exp = A_exp * mask  # this step masks
+    A_log_softmax = torch.log(A_exp / (torch.sum(A_exp, dim=dim, keepdim=True) + epsilon))
+    return A_log_softmax
 
 
 if __name__ == "__main__":
