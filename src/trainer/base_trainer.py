@@ -67,7 +67,8 @@ class BaseTrainer(object):
         self.checkpoint_dir = os.path.join(config['trainer']['save_dir'], config['arch']['type'], config["name"])
 
         # setup visualization writer instance
-        writer_dir = os.path.join(config['visualization']['log_dir'], config['arch']['type'], config["name"])
+        # writer_dir = os.path.join(config['visualization']['log_dir'], config['arch']['type'])
+        writer_dir = os.path.join(self.checkpoint_dir, config['visualization']['log_dir'])
         self.writer = SummaryWriter(log_dir=writer_dir)
 
         # Save configuration file into checkpoint directory:
