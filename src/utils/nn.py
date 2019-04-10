@@ -39,7 +39,7 @@ class LSTM(nn.Module):
                 nn.init.constant_(getattr(self.rnn, f'bias_ih_l{i}_reverse'), val=0)
                 getattr(self.rnn, f'bias_hh_l{i}_reverse').chunk(4)[1].fill_(1)
 
-    def forward(self, x):
+    def forward(self, x, total_length=None):
         x, x_len = x
         x = self.dropout(x)
 
@@ -50,7 +50,7 @@ class LSTM(nn.Module):
         x_packed = nn.utils.rnn.pack_padded_sequence(x_sorted, x_len_sorted, batch_first=True)
         x_packed, (h, c) = self.rnn(x_packed)
 
-        x = nn.utils.rnn.pad_packed_sequence(x_packed, batch_first=True)[0]
+        x = nn.utils.rnn.pad_packed_sequence(x_packed, batch_first=True, total_length=total_length)[0]
         x = x.index_select(dim=0, index=x_ori_idx)
         h = h.permute(1, 0, 2).contiguous().view(-1, h.size(0) * h.size(2)).squeeze()
         h = h.index_select(dim=0, index=x_ori_idx)
