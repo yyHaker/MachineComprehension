@@ -75,7 +75,6 @@ class Trainer(BaseTrainer):
             max_p_len = data.paras_word[0].shape[2]
             s_idx = data.s_idx + data.answer_para_idx * max_p_len
             e_idx = data.e_idx + data.answer_para_idx * max_p_len
-
             loss = self.loss(p1, s_idx) + self.loss(p2, e_idx)
             loss.backward()
             self.optimizer.step()

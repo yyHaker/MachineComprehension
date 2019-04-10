@@ -14,7 +14,7 @@ import sys
 # add current path to sys path
 sys.path.append(os.getcwd())
 from utils import *
-from utils.preprocess import find_search_multi_paras
+from utils.preprocess import find_search_paras
 
 
 def preprocessd_multi_para(path, save_path, train=True):
@@ -41,7 +41,7 @@ def preprocessd_multi_para(path, save_path, train=True):
             else:
                 data["yesno_answers"] = []
             # find para
-            data["paragraphs"] = find_search_multi_paras(sample)
+            data["paragraphs"] = find_search_paras(sample)
 
             # # find answer span
             if train:
