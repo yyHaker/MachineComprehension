@@ -14,6 +14,8 @@ import torch.nn.functional as F
 from utils.nn import Linear, LSTM
 from utils.util import log_softmax_mask, seq_mask
 
+INF = 1e30 # 定义正无穷
+
 
 class BiDAF(nn.Module):
     """BiDAF"""
@@ -434,8 +436,8 @@ class BiDAFMultiParas(nn.Module):
         p1, p2 = output_layer(concat_g, concat_m, concat_p_lens)
         # (batch, p_len), (batch, p_len)
         # print('pointer:', p1.shape, p2.shape)
-        # softmax_mask`
+        # mask，将padding位置-inf
         concat_p_word_mask = p_word_mask.reshape(p_word_mask.shape[0], -1)  # (batch, para_num*p_len)
-        p1 = log_softmax_mask(p1, concat_p_word_mask)
-        p2 = log_softmax_mask(p2, concat_p_word_mask)
+        p1 = -INF*(1-concat_p_word_mask)+p1
+        p2 = -INF*(1-concat_p_word_mask)+p2
         return p1, p2
