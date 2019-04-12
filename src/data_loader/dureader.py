@@ -161,16 +161,28 @@ class DuReader(object):
 
         # build iterators
         self.logger.info("building iterators....")
-        self.train_iter, self.eval_iter = data.BucketIterator.splits(datasets=(self.train, self.dev),
-                                                                     batch_sizes=[self.config["train_batch_size"], self.config["dev_batch_size"]],
-                                                                     # sort_key=lambda x: len(x.c_word),
-                                                                     # sort_within_batch=True,
-                                                                     device=self.config["device"],
-                                                                     shuffle=True)
+        # self.train_iter, self.eval_iter = data.BucketIterator.splits(datasets=(self.train, self.dev),
+        #                                                              batch_sizes=[self.config["train_batch_size"], self.config["dev_batch_size"]],
+        #                                                              sort_key=None,
+        #                                                              sort_within_batch=False,
+        #                                                              device=self.config["device"],
+        #                                                              shuffle=(True, False))
+        self.train_iter = data.BucketIterator(dataset=self.train,
+                                              batch_size=self.config["train_batch_size"],
+                                              device=self.config["device"],
+                                              shuffle=True)
+
+        self.eval_iter = data.BucketIterator(dataset=self.dev,
+                                             batch_size=self.config["dev_batch_size"],
+                                             device=self.config["device"],
+                                             sort_key=lambda x: max([max(para_len) for para_len in x.paras_word[2]]),
+                                             sort_within_batch=False,
+                                             shuffle=False)
+
         self.test_iter = data.BucketIterator(dataset=self.test,
-                                             batch_size=4,
-                                             # sort_key=lambda x: len(x.c_word),
-                                             # sort_within_batch=True,
+                                             batch_size=self.config["dev_batch_size"],
+                                             sort_key=lambda x: max([max(para_len) for para_len in x.paras_word[2]]),
+                                             sort_within_batch=True,
                                              device=self.config["device"],
                                              shuffle=False)
 
