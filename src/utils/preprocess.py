@@ -19,8 +19,8 @@ def find_fake_answer_from_multi_paras(sample, paragraphs):
     :return:
     """
     best_fake_answer = []
-    best_s_idx = 0
-    best_e_idx = 0
+    best_s_idx = -1
+    best_e_idx = -1
     best_score = 0.
     best_para_idx = -1
     for para_idx, para in enumerate(paragraphs):
