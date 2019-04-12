@@ -382,8 +382,8 @@ class BiDAFMultiParas(nn.Module):
         # p_char = char_emb_layer(batch.p_char)
         # q_char = char_emb_layer(batch.q_char)
         # 2. Word Embedding Layer
-        q_word, q_lens = batch.q_word[0], batch.q_word[1]
-        p_word, p_num, p_lens = batch.paras_word[0], batch.paras_word[1], batch.paras_word[2]
+        q_word, q_lens = batch.q_word[0], batch.q_word[1]  # (batch, p_len), (batch)
+        p_word, p_num, p_lens = batch.paras_word[0], batch.paras_word[1], batch.paras_word[2]  # (batch, para_num, p_len), (batch), (batch, para_num)
         batch_size = p_word.shape[0]
         max_para_num = p_word.shape[1]
         max_p_len = p_word.shape[2]
@@ -393,11 +393,8 @@ class BiDAFMultiParas(nn.Module):
         p_word_mask = seq_mask(p_lens_reshape, device=p_lens_reshape.device).reshape(p_lens.shape[0], p_lens.shape[1],
                                                                                      -1)  # (batch, para_num, p_len)
         # resghape p: (batch, para_num, p_len) -> (batch*para_num, p_len)
-        # reshape p_lens: (batch, para_num) -> (batch*para_num)
         # reshape para_mask: (batch, para_num) -> (batch*para_num, 1, 1)
         p_word = p_word.reshape(max_para_num * batch_size, -1)
-        origin_p_lens = p_lens
-        p_lens = p_lens.reshape(-1)
         reshape_para_mask = para_mask.reshape(-1).unsqueeze(1).unsqueeze(1)
         # print('reshape size:', q_word.shape, q_lens.shape, p_word.shape, p_lens.shape, reshape_para_mask.shape)
         p_word = self.word_emb(p_word)
@@ -408,8 +405,8 @@ class BiDAFMultiParas(nn.Module):
         q = highway_network(q_word)
         # print('Highway:', p.shape, q.shape)
         # 3. Contextual Embedding Layer
-        p = self.context_LSTM((p, p_lens))[0]  # (batch*para_num, hidden)
-        q = self.context_LSTM((q, q_lens))[0]  # (batch, para_num, hidden)
+        p = self.context_LSTM((p, p_lens_reshape))[0]  # (batch*para_num, p_len, hidden)
+        q = self.context_LSTM((q, q_lens))[0]  # (batch, q_len, hidden)
         # duplicate q: (batch, q_len) -> (batch*para_num, q_len)
         # duplicate q_lens: (batch) -> (batch*para_num)
         q = torch.stack([q for i in range(max_para_num)], dim=1).reshape(-1, q.shape[1], q.shape[2]) * reshape_para_mask
@@ -419,7 +416,7 @@ class BiDAFMultiParas(nn.Module):
         # TODO mask on attention
         g = att_flow_layer(p, q)
         # 5. Modeling Layer
-        m = self.modeling_LSTM2((self.modeling_LSTM1((g, p_lens))[0], p_lens))[0]
+        m = self.modeling_LSTM2((self.modeling_LSTM1((g, p_lens_reshape))[0], p_lens_reshape))[0]
         # print('modeling:', g.shape, m.shape)
         # 6. Output Layer
         # concat p: (batch*para_num, p_len, hidden) -> (batch, para_num*p_len, hidden)
@@ -428,7 +425,7 @@ class BiDAFMultiParas(nn.Module):
         # origin_p_lens:(batch, para_num) -> (batch) last para len + 2 * max_para_num
         concat_g = g.reshape(batch_size, -1, g.shape[-1])
         concat_m = m.reshape(batch_size, -1, m.shape[-1])
-        last_para_len = origin_p_lens[:, -1]
+        last_para_len = p_lens[:, -1]
         concat_p_lens = max_p_len * 2 + last_para_len
         # print('concat:', concat_g.shape, concat_m.shape, concat_p_lens.shape)
         # print('len before:', origin_p_lens)
