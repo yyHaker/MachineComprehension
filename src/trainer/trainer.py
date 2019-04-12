@@ -122,7 +122,10 @@ class Trainer(BaseTrainer):
             self.data_loader.eval_iter.device = self.device
             for batch_idx, data in enumerate(self.data_loader.eval_iter):
                 p1, p2 = self.model(data)
-                loss = self.loss(p1, data.s_idx) + self.loss(p2, data.e_idx)
+                max_p_len = data.paras_word[0].shape[2]
+                s_idx = data.s_idx + data.answer_para_idx * max_p_len
+                e_idx = data.e_idx + data.answer_para_idx * max_p_len
+                loss = self.loss(p1, s_idx) + self.loss(p2, e_idx)
 
                 # add scalar to writer
                 global_step = (epoch - 1) * len(self.data_loader.dev) + batch_idx
@@ -140,14 +143,15 @@ class Trainer(BaseTrainer):
                 score, e_idx = score.max(dim=1)
                 s_idx = torch.gather(s_idx, 1, e_idx.view(-1, 1)).squeeze()
 
+                concat_paras_words_idx = data.paras_word[0].reshape(data.paras_word[0].shape[0], -1)
                 for i in range(batch_size):
                     pred = {}
                     # get question id, answer, question
                     q_id = data.id[i]
-                    answer = data.c_word[0][i][s_idx[i]:e_idx[i] + 1]
-                    answer = ''.join([self.data_loader.WORD.vocab.itos[idx] for idx in answer])
+                    answer = concat_paras_words_idx[i][s_idx[i]:e_idx[i] + 1]
+                    answer = ''.join([self.data_loader.PARAS.vocab.itos[idx] for idx in answer])
                     question = data.q_word[0][i]
-                    question = ''.join([self.data_loader.WORD.vocab.itos[idx] for idx in question])
+                    question = ''.join([self.data_loader.PARAS.vocab.itos[idx] for idx in question])
                     # for pred
                     pred["question_id"] = q_id
                     pred["question"] = question
