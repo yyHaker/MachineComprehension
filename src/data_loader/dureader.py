@@ -158,6 +158,7 @@ class DuReader(object):
 
         # just for call easy
         self.vocab_vectors = self.PARAS.vocab.vectors
+        self.vocab = self.PARAS.vocab
 
         # build iterators
         self.logger.info("building iterators....")

@@ -11,8 +11,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from utils.nn import Linear, LSTM
-from utils.util import log_softmax_mask, seq_mask
+from utils.nn import Linear, LSTM, PartiallyTrainEmbedding
+from utils.util import seq_mask
 
 INF = 1e30 # 定义正无穷
 
@@ -213,7 +213,7 @@ class BiDAF(nn.Module):
 class BiDAFMultiParas(nn.Module):
     """BiDAF on multipal paragraphs"""
 
-    def __init__(self, args, pretrained):
+    def __init__(self, args, pretrained, trainable_weight_idx):
         super(BiDAFMultiParas, self).__init__()
         self.args = args["arch"]["args"]
 
@@ -226,7 +226,7 @@ class BiDAFMultiParas(nn.Module):
 
         # 2. Word Embedding Layer
         # initialize word embedding with GloVe
-        self.word_emb = nn.Embedding.from_pretrained(pretrained, freeze=True)
+        self.word_emb = PartiallyTrainEmbedding(pretrained, trainable_weight_idx)
 
         # highway network
         # assert self.args["hidden_size"] * 2 == (self.args["char_channel_size"] + self.args["word_dim"])

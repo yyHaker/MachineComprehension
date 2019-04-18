@@ -33,7 +33,8 @@ def predict(args):
     elif "search" in args.model:
         logger.info("use search model....")
     else:
-        raise Exception("Unknown  models!")
+        # raise Exception("Unknown  models!")
+        pass
     # load best model and params
     model_path = os.path.join(args.path, args.model)
     state = torch.load(model_path)
@@ -43,7 +44,7 @@ def predict(args):
     data_loader = getattr(module_data, config['data_loader']['type'])(config)
 
     # add config run params
-    config['arch']['args']['char_vocab_size'] = len(data_loader.CHAR.vocab)
+    # config['arch']['args']['char_vocab_size'] = len(data_loader.CHAR.vocab)
     config['arch']['args']['word_vocab_size'] = len(data_loader.WORD.vocab)
 
     device = config["data_loader"]["args"]["device"]
@@ -57,7 +58,8 @@ def predict(args):
     preds = []
     with torch.no_grad():
         # data_loader.test_iter.device = device
-        for batch_idx, data in enumerate(data_loader.test_iter):
+        data_iter = data_loader.eval_iter if args.on_dev else data_loader.test_iter
+        for batch_idx, data in enumerate(data_iter):
             p1, p2 = model(data)
             # 统计得到的answers
             # (batch, c_len, c_len)
@@ -70,20 +72,27 @@ def predict(args):
             score, e_idx = score.max(dim=1)
             s_idx = torch.gather(s_idx, 1, e_idx.view(-1, 1)).squeeze()
 
+            concat_paras_words_idx = data.paras_word[0].reshape(data.paras_word[0].shape[0], -1)
+            max_para_len = data.paras_word[0].shape[2]
             for i in range(batch_size):
                 pred = {}
                 # get question id, answer, question
                 q_id = data.id[i]
-                answer = data.c_word[0][i][s_idx[i]:e_idx[i] + 1]
-                answer = ''.join([data_loader.WORD.vocab.itos[idx] for idx in answer])
+                answer = concat_paras_words_idx[i][s_idx[i]:e_idx[i] + 1]
+                answer = ''.join([data_loader.PARAS.vocab.itos[idx] for idx in answer])
                 question = data.q_word[0][i]
-                question = ''.join([data_loader.WORD.vocab.itos[idx] for idx in question])
+                question = ''.join([data_loader.PARAS.vocab.itos[idx] for idx in question])
+                answer_para_idx = int(s_idx[i] // max_para_len)
                 # for pred
                 pred["question_id"] = q_id
                 pred["question"] = question
                 pred["answers"] = [answer]
                 pred["question_type"] = data.question_type[i]
                 pred["yesno_answers"] = []  # not predict now
+                if args.on_dev:
+                    # pred['s_idx'] = s_idx[i]
+                    # pred['e_idx'] = e_idx[i]
+                    pred['answer_para_idx'] = answer_para_idx
                 preds.append(pred)
             if batch_idx % 10000 == 0:
                 logger.info("predict {} samples done!".format((batch_idx + 1)) * batch_idx)
@@ -103,6 +112,7 @@ if __name__ == '__main__':
     parser.add_argument('-m', '--model', default=None, type=str, help="best model name(.pth)")
     parser.add_argument('-t', "--target", default="./result/predict/result.json", type=str, help="prediction result file")
     parser.add_argument('-d', '--device', default=None, type=str, help='indices of GPUs to enable (default: all)')
+    parser.add_argument('--on_dev', default=False, action='store_true', help='Whether get pred_result on dev')
     args = parser.parse_args()
 
     if args.device:

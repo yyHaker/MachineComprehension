@@ -76,3 +76,20 @@ class Linear(nn.Module):
             x = self.dropout(x)
         x = self.linear(x)
         return x
+
+
+class PartiallyTrainEmbedding(torch.nn.Module):
+    def __init__(self, weight, trainable_weight_idx):
+        super().__init__()
+        self.num_to_learn = trainable_weight_idx.shape[0]
+        self.trainable_weight_idx = trainable_weight_idx
+        self.trainable_weight = torch.nn.Parameter(torch.empty(self.num_to_learn, weight.shape[1]))
+        torch.nn.init.kaiming_uniform_(self.trainable_weight)
+        weight[trainable_weight_idx] = self.trainable_weight
+        self.register_buffer('weight', weight)
+
+    def forward(self, inp):
+        self.weight.detach_()
+        self.weight[self.trainable_weight_idx] = self.trainable_weight
+        return torch.nn.functional.embedding(
+            inp, self.weight, None, None, 2.0, False, False)
