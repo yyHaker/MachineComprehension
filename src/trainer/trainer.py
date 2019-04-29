@@ -69,12 +69,20 @@ class Trainer(BaseTrainer):
         # begin train
         self.data_loader.train_iter.device = self.device
         for batch_idx, data in enumerate(self.data_loader.train_iter):
+            # p1, p2, score = self.model(data)
             p1, p2 = self.model(data)
             self.optimizer.zero_grad()
             # 计算s_idx, e_idx在多个para连接时的绝对值
             max_p_len = data.paras_word[0].shape[2]
             s_idx = data.s_idx + data.answer_para_idx * max_p_len
             e_idx = data.e_idx + data.answer_para_idx * max_p_len
+
+            # use single para
+            # s_idx = data.s_idx
+            # e_idx = data.e_idx
+            # calc loss
+            lamda = self.config["loss"]["lamda"]
+            # loss = self.loss(p1, s_idx) + self.loss(p2, e_idx) + lamda * self.loss(score, data.answer_para_idx)
             loss = self.loss(p1, s_idx) + self.loss(p2, e_idx)
             loss.backward()
             self.optimizer.step()
@@ -121,11 +129,20 @@ class Trainer(BaseTrainer):
         with torch.no_grad():
             self.data_loader.eval_iter.device = self.device
             for batch_idx, data in enumerate(self.data_loader.eval_iter):
+                # p1, p2, score = self.model(data)
                 p1, p2 = self.model(data)
+                # use multi para
                 max_p_len = data.paras_word[0].shape[2]
                 s_idx = data.s_idx + data.answer_para_idx * max_p_len
                 e_idx = data.e_idx + data.answer_para_idx * max_p_len
+
+                # use single para
+                # s_idx = data.s_idx
+                # e_idx = data.e_idx
+
+                lamda = self.config["loss"]["lamda"]
                 loss = self.loss(p1, s_idx) + self.loss(p2, e_idx)
+                # loss = self.loss(p1, s_idx) + self.loss(p2, e_idx) + lamda * self.loss(score, data.answer_para_idx)
 
                 # add scalar to writer
                 global_step = (epoch - 1) * len(self.data_loader.dev) + batch_idx
@@ -143,7 +160,13 @@ class Trainer(BaseTrainer):
                 score, e_idx = score.max(dim=1)
                 s_idx = torch.gather(s_idx, 1, e_idx.view(-1, 1)).squeeze()
 
+                # for multiple para,  (batch, max_para_num, max_p_len)
                 concat_paras_words_idx = data.paras_word[0].reshape(data.paras_word[0].shape[0], -1)
+                # for single para
+                # p_word, p_num, p_lens = data.paras_word[0], data.paras_word[1], data.paras_word[2]  # (batch, max_para_num, max_p_len), (batch), (batch, max_para_num)
+                # c_word = torch.cat([torch.index_select(p, 0, i).unsqueeze(0) for p, i in zip(p_word, data.answer_para_idx)])  # (batch, 1, max_p_len)
+                # c_word = c_word.squeeze(1)  # (batch, max_p_len)
+                # concat_paras_words_idx = c_word
                 for i in range(batch_size):
                     pred = {}
                     # get question id, answer, question

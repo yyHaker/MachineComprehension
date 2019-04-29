@@ -8,3 +8,4 @@
 @time: 2019/3/9 15:39
 """
 from .bidaf import *
+from .spnet import *

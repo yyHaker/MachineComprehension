@@ -23,5 +23,5 @@ class IllegalWords(object):
             '&',
             'nbsp',
             '★',
-            '☆',
+            '☆'
         ]

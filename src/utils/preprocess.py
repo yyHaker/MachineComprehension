@@ -19,8 +19,8 @@ def find_fake_answer_from_multi_paras(sample, paragraphs):
     :return:
     """
     best_fake_answer = []
-    best_s_idx = 0
-    best_e_idx = 0
+    best_s_idx = -1
+    best_e_idx = -1
     best_score = 0.
     best_para_idx = -1
     for para_idx, para in enumerate(paragraphs):
@@ -166,15 +166,27 @@ def find_zhidao_paras(sample, train=True):
         for para in doc["segmented_paragraphs"]:
             if len(para) != 0:
                 paras.append(para)
-        paras = paras[: 4]
+        # 只要没超过最大长度，就一直加，直到所有para加完为止
         # 将每个doc的tile+4paras拼接
         c_para = c_para + title
         for para in paras:
             c_para = c_para + ["<sep>"] + para
+            if len(c_para) > 500:
+                break
         # 截取一定的长度(默认500)
         c_para = c_para[: 500] if len(c_para) > 500 else c_para
         best_paras.append(c_para)
     return best_paras
+
+
+def find_raw_zhidao_paras(sample):
+    """
+    从官方预处理的数据中dureader 1.0找para。
+    初步寻找前3个不为空的document的前4个不为空的paras，总共12个，不够的话使用
+    :param sample:
+    :return:
+    """
+    pass
 
 
 def choose_one_para(paras, question, metric_fn):
