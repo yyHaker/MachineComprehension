@@ -33,7 +33,7 @@ def main(config, resume):
     #     print("idx: ", idx, " ", data)
 
     # add config run params
-    config['arch']['args']['char_vocab_size'] = len(data_loader.CHAR.vocab)
+    # config['arch']['args']['char_vocab_size'] = len(data_loader.CHAR.vocab)
     config['arch']['args']['word_vocab_size'] = len(data_loader.WORD.vocab)
     sep_idx, eop_idx = data_loader.vocab.stoi['<sep>'], data_loader.vocab.stoi['<eop>']
     logger.info(f'idx:{sep_idx},{eop_idx}')
