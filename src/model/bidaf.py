@@ -269,6 +269,15 @@ class BiDAFMultiParas(nn.Module):
                                    batch_first=True,
                                    dropout=self.args["dropout"])
 
+        # para ranking (for task 2)
+        self.score_weight_qp = nn.Bilinear(self.args["hidden_size"] * 2, self.args["hidden_size"] * 2, 1)
+
+        # self-align layer for question
+        self.align_weight_q = Linear(self.args["hidden_size"]*2, 1)
+
+        # self-align layer for paras
+        self.align_weight_p = Linear(self.args["hidden_size"]*2, 1)
+
         # 6. Output Layer
         self.p1_weight_g = Linear(self.args["hidden_size"] * 8, 1, dropout=self.args["dropout"])
         self.p1_weight_m = Linear(self.args["hidden_size"] * 2, 1, dropout=self.args["dropout"])
@@ -428,17 +437,34 @@ class BiDAFMultiParas(nn.Module):
         g = att_flow_layer(p, q)
 
         # 5. Modeling Layer
+        # ---> (b*max_para_num, max_p_len, d)
         m = self.modeling_LSTM2((self.modeling_LSTM1((g, paras_lens_reshape))[0], paras_lens_reshape))[0]
 
         # 6. Output Layer
-        # concat p: (batch*para_num, p_len, hidden) -> (batch, para_num*p_len, hidden)
-        # g:(b*max_para_num, max_para_len, max_q_len) -> (b, max_para_num*max_para_len, max_q_len)
-        # m:(b*max_para_num, max_p_len, d) -> (b, max_para_num*max_p_len, d)
+        # concat p: (batch*para_num, p_len, d) -> (batch, para_num*p_len, d)
+        # g:(b*max_para_num, max_para_len, d) -> (b, max_para_num*max_para_len, d)
+        # m:(b*max_para_num, max_para_len, d) -> (b, max_para_num*max_para_len, d)
         # origin_p_lens:(batch, para_num) -> (batch) last para len + 2 * max_para_num
         concat_g = g.reshape(batch_size, -1, g.shape[-1])
         concat_m = m.reshape(batch_size, -1, m.shape[-1])
         last_para_len = paras_lens[:, -1]
         concat_paras_lens = max_para_len * 2 + last_para_len
+
+        # for para ranking:
+        # self-align paras
+        # m: (b*max_para_num, max_para_len, 2*d)  ----->  (b*max_para_num, max_para_len)
+        align_weight_p = F.softmax(self.align_weight_p(m).squeeze(2), dim=-1)
+        # [b*max_para_num, 1, max_p_len] * [b*max_para_num, max_p_len,  2*d] ---> [b*max_para_num, 1,  2*d] --> [b*max_para_num, 2*d]
+        rps = torch.bmm(align_weight_p.unsqueeze(1), m).squeeze(1)
+
+        # self-align q
+        # [b, max_q_len, 2*d] ---> [b, max_q_len]
+        align_weight_q = F.softmax(self.align_weight_q(q).squeeze(2), dim=-1)
+        #  [b*max_para_num, 1, max_q_len] * [b*max_para_num, max_q_len, 2*d] --> [b*max_para_num,1, 2*d ]  --> [b*max_para_num, 2*d]
+        rq = torch.bmm(align_weight_q.unsqueeze(1), q).squeeze(1)
+
+        # match score [b*max_para_num, 1]  --> [b, max_para_num]
+        score = F.softmax(self.score_weight_qp(rq, rps).squeeze(-1).view(batch_size, max_para_num), dim=-1)
 
         # (batch, p_len), (batch, p_len)
         p1, p2 = output_layer(concat_g, concat_m, concat_paras_lens)
