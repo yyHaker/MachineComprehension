@@ -218,7 +218,7 @@ class BiDAF(nn.Module):
 class BiDAFMultiParas(nn.Module):
     """BiDAF on multi paragraphs"""
 
-    def __init__(self, args, pretrained):
+    def __init__(self, args, pretrained, trainable_weight_idx):
         super(BiDAFMultiParas, self).__init__()
         self.args = args["arch"]["args"]
 

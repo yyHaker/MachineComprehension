@@ -35,9 +35,10 @@ def main(config, resume):
     # add config run params
     # config['arch']['args']['char_vocab_size'] = len(data_loader.CHAR.vocab)
     config['arch']['args']['word_vocab_size'] = len(data_loader.WORD.vocab)
-
+    sep_idx, eop_idx = data_loader.vocab.stoi['<sep>'], data_loader.vocab.stoi['<eop>']
+    logger.info(f'idx:{sep_idx},{eop_idx}')
     # build model architecture
-    model = getattr(module_arch, config['arch']['type'])(config, data_loader.vocab_vectors)
+    model = getattr(module_arch, config['arch']['type'])(config, data_loader.vocab_vectors, torch.tensor([sep_idx, eop_idx]))
 
     # get function handles of loss
     loss = getattr(module_loss, config['loss']['type'])
