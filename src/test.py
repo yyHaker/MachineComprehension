@@ -46,11 +46,13 @@ def predict(args):
     # add config run params
     # config['arch']['args']['char_vocab_size'] = len(data_loader.CHAR.vocab)
     config['arch']['args']['word_vocab_size'] = len(data_loader.WORD.vocab)
+    sep_idx, eop_idx = data_loader.vocab.stoi['<sep>'], data_loader.vocab.stoi['<eop>']
+    logger.info(f'idx:{sep_idx},{eop_idx}')
 
     device = config["data_loader"]["args"]["device"]
 
     # build model architecture
-    model = getattr(module_arch, config['arch']['type'])(config, data_loader.vocab_vectors)
+    model = getattr(module_arch, config['arch']['type'])(config, data_loader.vocab_vectors, torch.tensor([sep_idx, eop_idx]))
     model.load_state_dict(state_dict)
     model.to(device)
     model.eval()
@@ -60,7 +62,7 @@ def predict(args):
         # data_loader.test_iter.device = device
         data_iter = data_loader.eval_iter if args.on_dev else data_loader.test_iter
         for batch_idx, data in enumerate(data_iter):
-            p1, p2 = model(data)
+            p1, p2, score = model(data)
             # 统计得到的answers
             # (batch, c_len, c_len)
             batch_size, c_len = p1.size()
@@ -72,6 +74,7 @@ def predict(args):
             score, e_idx = score.max(dim=1)
             s_idx = torch.gather(s_idx, 1, e_idx.view(-1, 1)).squeeze()
 
+            # for multiple para: (batch, max_para_num, max_p_len)
             concat_paras_words_idx = data.paras_word[0].reshape(data.paras_word[0].shape[0], -1)
             max_para_len = data.paras_word[0].shape[2]
             for i in range(batch_size):
@@ -82,7 +85,8 @@ def predict(args):
                 answer = ''.join([data_loader.PARAS.vocab.itos[idx] for idx in answer])
                 question = data.q_word[0][i]
                 question = ''.join([data_loader.PARAS.vocab.itos[idx] for idx in question])
-                answer_para_idx = int(s_idx[i] // max_para_len)
+                # for para idx, s_idx: [batch]
+                answer_para_idx = int(s_idx[i].item() // max_para_len)
                 # for pred
                 pred["question_id"] = q_id
                 pred["question"] = question

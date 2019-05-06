@@ -473,4 +473,4 @@ class BiDAFMultiParas(nn.Module):
         concat_p_word_mask = paras_word_mask.reshape(paras_word_mask.shape[0], -1)  # (b, max_para_num*max_para_len)
         p1 = -INF*(1-concat_p_word_mask)+p1
         p2 = -INF*(1-concat_p_word_mask)+p2
-        return p1, p2
+        return p1, p2, score

@@ -183,7 +183,7 @@ class DuReader(object):
         self.test_iter = data.BucketIterator(dataset=self.test,
                                              batch_size=self.config["dev_batch_size"],
                                              sort_key=lambda x: max([max(para_len) for para_len in x.paras_word[2]]),
-                                             sort_within_batch=True,
+                                             sort_within_batch=False,
                                              device=self.config["device"],
                                              shuffle=False)
 

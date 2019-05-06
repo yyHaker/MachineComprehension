@@ -69,8 +69,8 @@ class Trainer(BaseTrainer):
         # begin train
         self.data_loader.train_iter.device = self.device
         for batch_idx, data in enumerate(self.data_loader.train_iter):
-            # p1, p2, score = self.model(data)
-            p1, p2 = self.model(data)
+            p1, p2, score = self.model(data)
+            # p1, p2 = self.model(data)
             self.optimizer.zero_grad()
             # 计算s_idx, e_idx在多个para连接时的绝对值
             max_p_len = data.paras_word[0].shape[2]
@@ -82,8 +82,8 @@ class Trainer(BaseTrainer):
             # e_idx = data.e_idx
             # calc loss
             lamda = self.config["loss"]["lamda"]
-            # loss = self.loss(p1, s_idx) + self.loss(p2, e_idx) + lamda * self.loss(score, data.answer_para_idx)
-            loss = self.loss(p1, s_idx) + self.loss(p2, e_idx)
+            loss = self.loss(p1, s_idx) + self.loss(p2, e_idx) + lamda * self.loss(score, data.answer_para_idx)
+            # loss = self.loss(p1, s_idx) + self.loss(p2, e_idx)
             loss.backward()
             self.optimizer.step()
 
@@ -129,8 +129,8 @@ class Trainer(BaseTrainer):
         with torch.no_grad():
             self.data_loader.eval_iter.device = self.device
             for batch_idx, data in enumerate(self.data_loader.eval_iter):
-                # p1, p2, score = self.model(data)
-                p1, p2 = self.model(data)
+                p1, p2, score = self.model(data)
+                # p1, p2 = self.model(data)
                 # use multi para
                 max_p_len = data.paras_word[0].shape[2]
                 s_idx = data.s_idx + data.answer_para_idx * max_p_len
@@ -141,8 +141,8 @@ class Trainer(BaseTrainer):
                 # e_idx = data.e_idx
 
                 lamda = self.config["loss"]["lamda"]
-                loss = self.loss(p1, s_idx) + self.loss(p2, e_idx)
-                # loss = self.loss(p1, s_idx) + self.loss(p2, e_idx) + lamda * self.loss(score, data.answer_para_idx)
+                # loss = self.loss(p1, s_idx) + self.loss(p2, e_idx)
+                loss = self.loss(p1, s_idx) + self.loss(p2, e_idx) + lamda * self.loss(score, data.answer_para_idx)
 
                 # add scalar to writer
                 global_step = (epoch - 1) * len(self.data_loader.dev) + batch_idx
