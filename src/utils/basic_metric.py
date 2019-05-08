@@ -30,6 +30,29 @@ def metric_max_over_ground_truths(metric_fn, prediction, ground_truths):
     return max(scores_for_ground_truths)
 
 
+def metric_max_over_ground_truths_with_idx(metric_fn, prediction, ground_truths):
+    """
+    This function calculates and returns the precision, recall and f1-score
+    相比上个函数，增加了最佳匹配对应的ground_truths的idx
+    Args:
+        metric_fn: metric function pointer which calculates scores according to corresponding logic.
+        prediction: prediction string list to be matched.
+        ground_truths: golden string list reference.
+    Returns:
+        floats of (p, r, f1)
+    Raises:
+        None
+    """
+    max_score = -1
+    max_idx = -1
+    for idx, ground_truth in enumerate(ground_truths):
+        score = metric_fn(prediction, ground_truth)
+        if score > max_score:
+            max_score = score
+            max_idx = idx
+    return max_score, max_idx
+
+
 def precision_recall_f1(prediction, ground_truth):
     """
     This function calculates and returns the precision, recall and f1-score

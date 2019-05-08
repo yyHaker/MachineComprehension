@@ -13,7 +13,7 @@ from torchtext import data
 import torchtext.vocab as vocab
 from utils import *
 import logging
-
+import pickle
 
 class DuReader(object):
     """DuReader dataset loader"""
@@ -147,14 +147,28 @@ class DuReader(object):
             self.test = data.Dataset(examples=test_examples, fields=test_list_fields)
 
         # build vocab
-        self.logger.info("build vocab....")
-        # self.CHAR.build_vocab(self.train, self.dev)
-        self.PARAS.build_vocab(self.train.paras_word, self.train.q_word, self.dev.paras_word, self.dev.q_word)
-        self.Q_WORD.vocab = self.PARAS.vocab
+        vocab_cache_path = f"{data_path}/{self.config['vocab_cache']}"
+        if not os.path.exists(vocab_cache_path):
+            self.logger.info("build vocab....")
+            # self.CHAR.build_vocab(self.train, self.dev)
+            self.PARAS.build_vocab(self.train.paras_word, self.train.q_word, self.dev.paras_word, self.dev.q_word)
+            self.Q_WORD.vocab = self.PARAS.vocab
 
-        # load pretrained embeddings
-        Vectors = vocab.Vectors(self.config["pretrain_emd_file"])
-        self.PARAS.vocab.load_vectors(Vectors)
+            # load pretrained embeddings
+            Vectors = vocab.Vectors(self.config["pretrain_emd_file"])
+            self.PARAS.vocab.load_vectors(Vectors)
+
+            # save vocab cache
+            self.logger.info("save vocab....")
+            with open(vocab_cache_path, 'wb') as fout:
+                pickle.dump(self.PARAS.vocab, fout)
+        else:
+            # load vocab
+            self.logger.info(f"load vocab from {vocab_cache_path} ....")
+            with open(vocab_cache_path, 'rb') as fin:
+                self.PARAS.vocab = pickle.load(fin)
+                self.WORD.vocab = self.PARAS.vocab
+                self.Q_WORD.vocab = self.PARAS.vocab
 
         # just for call easy
         self.vocab_vectors = self.PARAS.vocab.vectors
@@ -162,12 +176,7 @@ class DuReader(object):
 
         # build iterators
         self.logger.info("building iterators....")
-        # self.train_iter, self.eval_iter = data.BucketIterator.splits(datasets=(self.train, self.dev),
-        #                                                              batch_sizes=[self.config["train_batch_size"], self.config["dev_batch_size"]],
-        #                                                              sort_key=None,
-        #                                                              sort_within_batch=False,
-        #                                                              device=self.config["device"],
-        #                                                              shuffle=(True, False))
+
         self.train_iter = data.BucketIterator(dataset=self.train,
                                               batch_size=self.config["train_batch_size"],
                                               device=self.config["device"],

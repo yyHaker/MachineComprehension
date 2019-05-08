@@ -88,7 +88,7 @@ def preprocessd(path, save_path, train=True):
             data["paragraph"] = choose_one_para(best_paras, sample["segmented_question"], recall)  # 当前使用单para
             data["paragraphs"] = best_paras  # multiple paras
             if train:
-                data["fake_answer"], data["s_idx"], data["e_idx"], data["match_score"], data["answer_para_idx"] \
+                data["fake_answer"], data["s_idx"], data["e_idx"], data["match_score"], data["answer_para_idx"], data["answer_idx"] \
                     = find_fake_answer_from_multi_paras(sample, data["paragraphs"])
             # for paragraphs post_process(just for torchText easy to use)
             data["paragraphs"] = post_process_paras(best_paras, max_len=3)

@@ -14,7 +14,7 @@ import sys
 # add current path to sys path
 sys.path.append(os.getcwd())
 from utils import *
-from utils.preprocess import find_search_paras, find_fake_answer_2
+from utils.preprocess import find_search_paras
 
 
 def preprocessd_multi_para(path, save_path, train=True):
@@ -41,13 +41,13 @@ def preprocessd_multi_para(path, save_path, train=True):
             else:
                 data["yesno_answers"] = []
             # find para
-            best_paras = find_search_paras_2(sample)
+            best_paras = find_search_paras(sample)
             if len(best_paras) == 0:
                     continue
             data["paragraphs"] = best_paras
             # # find answer span
             if train:
-                data["fake_answer"], data["s_idx"], data["e_idx"], data["match_score"], data["answer_para_idx"] \
+                data["fake_answer"], data["s_idx"], data["e_idx"], data["match_score"], data["answer_para_idx"], data["answer_idx"]\
                     = find_fake_answer_from_multi_paras(sample, data["paragraphs"])
             if not train or data['match_score'] != 0:
                 datas.append(data)
