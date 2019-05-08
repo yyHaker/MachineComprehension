@@ -1,21 +1,19 @@
 #!/usr/bin/python
 # coding:utf-8
 
-"""
+"""直接从dureader 2019.1.0的官方预处理数据中读取数据
 @author: yyhaker
 @contact: 572176750@qq.com
-@file: dureader.py
-@time: 2019/3/23 21:27
+@file: dureader_1.0.py
+@time: 2019/4/18 19:53
 """
-import codecs
-import json
 from torchtext import data
 import torchtext.vocab as vocab
 from utils import *
 import logging
-import pickle
 
-class DuReader(object):
+
+class DuReader_RAW(object):
     """DuReader dataset loader"""
     def __init__(self, config):
         # logger
@@ -147,36 +145,26 @@ class DuReader(object):
             self.test = data.Dataset(examples=test_examples, fields=test_list_fields)
 
         # build vocab
-        vocab_cache_path = f"{data_path}/{self.config['vocab_cache']}"
-        if not os.path.exists(vocab_cache_path):
-            self.logger.info("build vocab....")
-            # self.CHAR.build_vocab(self.train, self.dev)
-            self.PARAS.build_vocab(self.train.paras_word, self.train.q_word, self.dev.paras_word, self.dev.q_word)
-            self.Q_WORD.vocab = self.PARAS.vocab
+        self.logger.info("build vocab....")
+        # self.CHAR.build_vocab(self.train, self.dev)
+        self.PARAS.build_vocab(self.train.paras_word, self.train.q_word, self.dev.paras_word, self.dev.q_word)
+        self.Q_WORD.vocab = self.PARAS.vocab
 
-            # load pretrained embeddings
-            Vectors = vocab.Vectors(self.config["pretrain_emd_file"])
-            self.PARAS.vocab.load_vectors(Vectors)
-
-            # save vocab cache
-            self.logger.info("save vocab....")
-            with open(vocab_cache_path, 'wb') as fout:
-                pickle.dump(self.PARAS.vocab, fout)
-        else:
-            # load vocab
-            self.logger.info(f"load vocab from {vocab_cache_path} ....")
-            with open(vocab_cache_path, 'rb') as fin:
-                self.PARAS.vocab = pickle.load(fin)
-                self.WORD.vocab = self.PARAS.vocab
-                self.Q_WORD.vocab = self.PARAS.vocab
+        # load pretrained embeddings
+        Vectors = vocab.Vectors(self.config["pretrain_emd_file"])
+        self.PARAS.vocab.load_vectors(Vectors)
 
         # just for call easy
         self.vocab_vectors = self.PARAS.vocab.vectors
-        self.vocab = self.PARAS.vocab
 
         # build iterators
         self.logger.info("building iterators....")
-
+        # self.train_iter, self.eval_iter = data.BucketIterator.splits(datasets=(self.train, self.dev),
+        #                                                              batch_sizes=[self.config["train_batch_size"], self.config["dev_batch_size"]],
+        #                                                              sort_key=None,
+        #                                                              sort_within_batch=False,
+        #                                                              device=self.config["device"],
+        #                                                              shuffle=(True, False))
         self.train_iter = data.BucketIterator(dataset=self.train,
                                               batch_size=self.config["train_batch_size"],
                                               device=self.config["device"],
@@ -192,7 +180,7 @@ class DuReader(object):
         self.test_iter = data.BucketIterator(dataset=self.test,
                                              batch_size=self.config["dev_batch_size"],
                                              sort_key=lambda x: max([max(para_len) for para_len in x.paras_word[2]]),
-                                             sort_within_batch=False,
+                                             sort_within_batch=True,
                                              device=self.config["device"],
                                              shuffle=False)
 
@@ -207,12 +195,11 @@ class DuReader(object):
         if "v1.0" in self.config["data_path"]:
             self.logger.info("read processed data...")
             self.read_preprocess(path, save_path, train=train)
-        elif "v2.0" in self.config["data_path"]:
-            self.logger.info("pre preprocessed data...")
-            self.pre_preprocess(path, save_path, train=train)
+        else:
+            raise Exception("not supported data version!")
 
     def read_preprocess(self, path, save_path, train=True):
-        """preprocess the process data to a list of dict. (just read)
+        """preprocess the process data to a list of dict. (just for easy to read)
             1. 使用预先处理的已经分词的数据
             2. 使用一个sample的处理之后字段
         ----------
@@ -224,11 +211,18 @@ class DuReader(object):
             "question_id": "",
             "question": "",
             "question_type": "",
-            "paragraph": "",
+            "document1": "[[], [], [],...,[]]",  # a list of paras
+            "document2": "[[], [], [],...,[]]",
+            "document3": "[[], [], [],...,[]]",
+            "document4": "[[], [], [],...,[]]",
+            "document5": "[[], [], [],...,[]]",
+            "doc_idx": , # 正确答案所在的doc idx
+            "indoc_para_idx: ", # 正确答案所在的para idx
+            "paragraphs": "[[], [], [],...,[]]",  # a list of list words
+            "para_idx": 正确答案所在的para index, 用于训练PR
             "s_idx": 12,
-            "e_idx": 13,
-            "fake_answer": "",
-            "yesno_answers": "",
+            "e_idx": 13,     #  表示所选中para的answer span
+            "yesno_answers": "",    # 用于处理Yes_NO的question
             "match_score": 0.8  # the F1 of fake_answer and true answer
         }  # 训练一个找answer span的模型 + 判断yes_no, 可测试时候怎么做？
         """
@@ -256,8 +250,10 @@ class DuReader(object):
                     data["yesno_answers"] = sample["yesno_answers"]
                 else:
                     data["yesno_answers"] = []
+                # find paras (启发式：)
+
                 if train:
-                    # find para
+
                     # sample["answer_docs"]有可能为空，即使answer不为空
                     if len(sample["answer_docs"]) == 0:
                         continue
@@ -305,92 +301,6 @@ class DuReader(object):
                     if len(best_para) == 0:
                         continue
                 datas.append(data)
-        # write to processed data file
-        self.logger.info("processed done! write to file!")
-        with codecs.open(save_path, "w", encoding="utf-8") as f_out:
-            for line in datas:
-                json.dump(line, f_out, ensure_ascii=False)
-                print("", file=f_out)
-
-    def pre_preprocess(self, path, save_path, train=True):
-        """preprocess the process data to a list of dict. (own preprocess method)
-            1. 使用预先处理的已经分词的数据
-            2. 使用一个sample的字段有：
-                “question_id”: ,
-                "question_type": ,
-                "segmented_question": ,
-                "documents": [
-                                    ["segmented_title":   ,  "segmented_paragraphs": []] ，
-                                    ["segmented_title":   ,  "segmented_paragraphs": []],
-                                    ["segmented_title":   ,  "segmented_paragraphs": []].
-                           ]
-                "segmented_answers": [ ] ,
-             3. 仅仅使用前三篇的document, 使用每个document的所有title+paragraph替换paragraph（保证截取文本的长度不超过预先设置的最大长度(500)）
-             4. 计算各个paragraph和问题的BLUE-4分数，以衡量paragraph和问题的相关性，在分数前K的paragraph中，选择最早出现的paragraph.
-              (paragraph选好了)
-            5. 对于每个答案，在paragraph中选择与答案F1分数最高的片段，作为这个答案的参考答案片段；如果只有一个答案的模型，
-            选择任意一个答案或者F1分数最高的那个答案对应的最佳的片段作为参考答案片段，训练时使用。
-        ----------
-        # question_type: "YES_NO": 0, "DESCRIPTION": 1, "ENTITY": 2
-        # cyesno_answers: "Yes": 0, "No": 1, "Depends": "2"
-        :param path:
-        :return:
-        (文本均是分词后的结果)
-         train_d = {
-            "question_id": "",
-            "question": "",
-            "question_type": "",
-            "paragraphs": "[[], [], ..., []]",   # 多个para
-            "s_idx": 12,
-            "e_idx": 13,
-            "fake_answer": "",
-            "yesno_answers": "",
-            "match_score": 0.8 , # the F1 of fake_answer and true answer
-            "para_idx": 3   # 可用于训练para ranking
-        }  # 训练一个找answer span的模型 + 判断yes_no, 可测试时候怎么做？
-        """
-        # read process data.
-        datas = []
-        with open(path, 'r', encoding="utf-8") as f:
-            for idx, line in enumerate(f):
-                if (idx+1) % 1000 == 0:
-                    self.logger.info("processed: {}".format(idx+1))
-                sample = json.loads(line.strip())
-                # just pass for no answer sample.(for train)
-                if train:
-                    if "answers" not in sample.keys() or len(sample["answers"]) == 0:
-                        continue
-                # copy to data
-                data = {}
-                data["question_id"] = sample["question_id"]
-                data["question"] = sample["segmented_question"]
-                data["question_type"] = sample["question_type"]
-                if "yesno_answers" in sample.keys():
-                    data["yesno_answers"] = sample["yesno_answers"]
-                else:
-                    data["yesno_answers"] = []
-                # 过滤sample中paragraphs的非法字符
-                sample = filter_illegal_words(sample)
-                # find para (for zhidao and search)
-                if "zhidao" in path:
-                    best_paras = find_zhidao_paras(sample, train)
-                elif "search" in path:
-                    best_paras = find_search_paras(sample)
-                else:
-                    raise Exception("not supported data processing!")
-                # skip len(best_paras)=0 samples
-                if len(best_paras) == 0:
-                    continue
-                # choose best paras and  answer spans
-                # data["paragraph"] = choose_one_para(best_paras, sample["segmented_question"], recall)  # 当前使用单para
-                data["paragraphs"] = best_paras  # multiple paras
-                if train:
-                    data["fake_answer"], data["s_idx"], data["e_idx"], data["match_score"], data["answer_para_idx"] \
-                        = find_fake_answer_from_multi_paras(sample, data["paragraphs"])
-                # for paragraphs post_process(just for torchText easy to use)
-                data["paragraphs"] = post_process_paras(best_paras, max_len=3)
-                if not train or data['match_score'] != 0:
-                    datas.append(data)
         # write to processed data file
         self.logger.info("processed done! write to file!")
         with codecs.open(save_path, "w", encoding="utf-8") as f_out:

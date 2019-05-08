@@ -132,6 +132,39 @@ def log_softmax_mask(A, mask, dim=1, epsilon=1e-12):
     return A_log_softmax
 
 
+def repeat_tensor(tensor, dim=0, times=2):
+    """
+    repeat tensor along a dim for times. (将某一行连续复制times次)
+    :param tensor: [b, *]
+    :param dim:
+    :param times: repeat time.
+    :return:  [b*times, *]
+    -------
+    Example:
+    >>>a = torch.rand(3, 5)
+    >>>a
+    >>>tensor([[ 0.2531,  0.5096,  0.4381,  0.3080,  0.0861],
+        [ 0.9698,  0.4726,  0.1682,  0.9173,  0.5383],
+        [ 0.2139,  0.1363,  0.1656,  0.6204,  0.8971]])
+    >>>repeat_tensor(a, 0, 2)
+    >>>tensor([[ 0.2531,  0.5096,  0.4381,  0.3080,  0.0861],
+        [ 0.2531,  0.5096,  0.4381,  0.3080,  0.0861],
+        [ 0.9698,  0.4726,  0.1682,  0.9173,  0.5383],
+        [ 0.9698,  0.4726,  0.1682,  0.9173,  0.5383],
+        [ 0.2139,  0.1363,  0.1656,  0.6204,  0.8971],
+        [ 0.2139,  0.1363,  0.1656,  0.6204,  0.8971]])
+    """
+    res = []
+    for i in range(tensor.size(0)):
+        ai = tensor[i].unsqueeze(0)
+        if len(ai.size()) == 2:
+            ai = ai.repeat(times, 1)  # [times, d]
+        elif len(ai.size()) == 3:
+            ai = ai.repeat(times, 1, 1)
+        res.append(ai)
+    return torch.cat(res, dim=dim)
+
+
 if __name__ == "__main__":
     text = "I like playing computer games."
     sent = "I want to watch tv in living room"
@@ -141,4 +174,11 @@ if __name__ == "__main__":
 
     a = ["a", "<sep>", "b", "c", "<sep>", "hjlo", "Hi", "<sep>"]
     res = split_list(a, "<sep>")
+
+    a = torch.rand(3, 5, 7)
+    print("a: ")
+    print(a)
+    res = repeat_tensor(a, 0, 3)
+    print("res: ")
     print(res)
+

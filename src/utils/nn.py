@@ -78,7 +78,7 @@ class Linear(nn.Module):
         return x
 
 
-class PartiallyTrainEmbedding(torch.nn.Module):
+class PartiallyTrainEmbedding(nn.Module):
     def __init__(self, weight, trainable_weight_idx):
         super().__init__()
         self.num_to_learn = trainable_weight_idx.shape[0]

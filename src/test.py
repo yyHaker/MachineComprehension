@@ -62,7 +62,7 @@ def predict(args):
         # data_loader.test_iter.device = device
         data_iter = data_loader.eval_iter if args.on_dev else data_loader.test_iter
         for batch_idx, data in enumerate(data_iter):
-            p1, p2 = model(data)
+            p1, p2, score = model(data)
             # 统计得到的answers
             # (batch, c_len, c_len)
             batch_size, c_len = p1.size()

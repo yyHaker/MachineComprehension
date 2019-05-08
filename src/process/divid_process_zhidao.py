@@ -85,14 +85,15 @@ def preprocessd(path, save_path, train=True):
             # skip len(best_paras)=0 samples
             if len(best_paras) == 0:
                 continue
-            data["paragraph"] = choose_one_para(best_paras, sample["segmented_question"], recall)  # 当前使用单para
+            # data["paragraph"] = choose_one_para(best_paras, sample["segmented_question"], recall)  # 当前使用单para
             data["paragraphs"] = best_paras  # multiple paras
             if train:
                 data["fake_answer"], data["s_idx"], data["e_idx"], data["match_score"], data["answer_para_idx"], data["answer_idx"] \
                     = find_fake_answer_from_multi_paras(sample, data["paragraphs"])
             # for paragraphs post_process(just for torchText easy to use)
             data["paragraphs"] = post_process_paras(best_paras, max_len=3)
-            datas.append(data)
+            if not train or data['match_score'] != 0:
+                datas.append(data)
     # write to processed data file
     ensure_dir(os.path.split(save_path)[0])
     print("processed done! write to file!")

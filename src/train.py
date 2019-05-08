@@ -14,7 +14,6 @@ import os
 import logging
 
 import torch
-
 import data_loader.dureader as module_data
 import model.bidaf as module_arch
 import loss.loss as module_loss

@@ -26,9 +26,9 @@ def combine(args):
         for j, d in enumerate(search_file):
             preds.append(json.loads(d))
     # for no para search (test1)
-    with open('./result/predict/no_para_search.json', 'r', encoding='utf-8') as no_para_serach_file:
-        for j, d in enumerate(no_para_serach_file):
-            preds.append(json.loads(d))
+    # with open('./result/predict/no_para_search.json', 'r', encoding='utf-8') as no_para_serach_file:
+    #     for j, d in enumerate(no_para_serach_file):
+    #         preds.append(json.loads(d))
     # combine all data
     with open(result, 'w', encoding='utf-8') as f:
         for d in preds:
