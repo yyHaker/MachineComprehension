@@ -466,7 +466,8 @@ class BiDAFMultiParas(nn.Module):
         rq = torch.bmm(align_weight_q.unsqueeze(1), q).squeeze(1)
 
         # match score [b*max_para_num, 1]  --> [b, max_para_num]
-        pr_score = self.score_weight_qp(rq, rps).squeeze(-1).view(batch_size, max_para_num) * paras_mask
+        pr_score = self.score_weight_qp(rq, rps).squeeze(-1).view(batch_size, max_para_num)
+        pr_score = -INF * (1 - paras_mask) + pr_score
 
         if train:
             # concat all para to predict answer
