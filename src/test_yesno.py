@@ -2,11 +2,13 @@
 # coding:utf-8
 
 """
-@author: yyhaker
-@contact: 572176750@qq.com
-@file: test.py
-@time: 2019/4/2 09:00
+@author: Mingxiang Tuo
+@contact: tuomx@qq.com
+@file: test_yesno.py
+@time: 2019/5/6 15:48
+预测yesno类型的answer，作为yesno分类模型的输入
 """
+
 import argparse
 import json
 import os
@@ -18,6 +20,7 @@ import data_loader.dureader as module_data
 import model.bidaf as module_arch
 from utils import ensure_dir
 import codecs
+from du_evaluation_metric import calc_score
 
 
 def predict(args):
@@ -28,20 +31,25 @@ def predict(args):
     """
     # get logger
     logger = logging.getLogger('MC')
-    if "zhidao" in args.model:
+    if "zhidao" in args.path:
         logger.info("use zhidao models...")
-    elif "search" in args.model:
+    elif "search" in args.path:
         logger.info("use search model....")
     else:
         # raise Exception("Unknown  models!")
         pass
-
     # load best model and params
-    model_path = os.path.join(args.path, args.model)
-    state = torch.load(model_path)
+    state = torch.load(args.path)
     config = state["config"]   # test file path is in config.json
+    config['data_loader']['args']['process_info'] = args.process_info
+    config['data_loader']['args']['vocab_cache'] = args.vocab_cache
+    config['data_loader']['args']['train_batch_size'] = args.batch_size
     config['data_loader']['args']['dev_batch_size'] = args.batch_size
     state_dict = state["state_dict"]
+
+    logger.info('Run with config:')
+    logger.info(json.dumps(config, indent=True))
+
     # setup data_loader instances
     data_loader = getattr(module_data, config['data_loader']['type'])(config)
 
@@ -58,13 +66,18 @@ def predict(args):
     model.load_state_dict(state_dict)
     model.to(device)
     model.eval()
-    logger.info("begin predict examples...")
+    logger.info(f"begin predict examples on {args.file}...")
     preds = []
     with torch.no_grad():
         # data_loader.test_iter.device = device
-        data_iter = data_loader.eval_iter if args.on_dev else data_loader.test_iter
+        if args.file == 'train':
+            data_iter = data_loader.train_iter
+        elif args.file == 'dev':
+            data_iter = data_loader.eval_iter
+        else:
+            data_iter = data_loader.test_iter
+
         for batch_idx, data in enumerate(data_iter):
-            # p1, p2, score = model(data)
             p1, p2 = model(data)
             # 统计得到的answers
             # (batch, c_len, c_len)
@@ -83,8 +96,9 @@ def predict(args):
             for i in range(batch_size):
                 pred = {}
                 # get question id, answer, question
-                q_id = data.id[i]
                 filter_idxs = [data_loader.vocab.stoi['<pad>'], data_loader.vocab.stoi['<sep>'], data_loader.vocab.stoi['<eop>']]
+
+                q_id = data.id[i]
                 answer = concat_paras_words_idx[i][s_idx[i]:e_idx[i] + 1]
                 answer_words = [data_loader.PARAS.vocab.itos[idx] for idx in answer if idx not in filter_idxs]
                 answer = ''.join(answer_words)
@@ -94,6 +108,7 @@ def predict(args):
                 question_words = [data_loader.PARAS.vocab.itos[idx] for idx in question if idx not in filter_idxs]
                 question = ''.join(question_words)
                 segmented_question = ' '.join(question_words)
+
                 # for para idx, s_idx: [batch]
                 answer_para_idx = int(s_idx[i].item() // max_para_len)
                 # for pred
@@ -103,11 +118,8 @@ def predict(args):
                 pred["segmented_answers"] = [segmented_answer]
                 pred["answers"] = [answer]
                 pred["question_type"] = data.question_type[i]
-                pred["yesno_answers"] = []  # not predict now
-                if args.on_dev:
-                    # pred['s_idx'] = s_idx[i]
-                    # pred['e_idx'] = e_idx[i]
-                    pred['answer_para_idx'] = answer_para_idx
+                pred["yesno_answers"] = []# not predict now
+                pred["yesno_label"] = data.yesno_answers[i]
                 preds.append(pred)
             if batch_idx % 10 == 0:
                 logger.info("predict {} samples done!".format((batch_idx + 1) * batch_size))
@@ -120,15 +132,22 @@ def predict(args):
             json.dump(pred, f, ensure_ascii=False)
             print("", file=f)
 
+    if args.eval:
+        results = calc_score(predict_file, args.ref_file)
+        logger.info("ROUGE-L :{}, BLUE-4: {}".format(results["ROUGE-L"], results["BLUE-4"]))
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='PyTorch MC')
     parser.add_argument('-b', '--batch_size', default=64, type=int, help='batch_size')
-    parser.add_argument('-p', "--path", default="./result/dureader/saved", type=str, help="best model directory")
-    parser.add_argument('-m', '--model', default=None, type=str, help="best model name(.pth)")
-    parser.add_argument('-t', "--target", default="./result/predict/result.json", type=str, help="prediction result file")
-    parser.add_argument('-d', '--device', default=None, type=str, help='indices of GPUs to enable (default: all)')
-    parser.add_argument('--on_dev', default=False, action='store_true', help='Whether get pred_result on dev')
+    parser.add_argument('-p', "--path", default="", type=str, help="best model directory")
+    parser.add_argument('-i', '--process_info', default='', type=str, help="process_info in args")
+    parser.add_argument('-v', '--vocab_cache', default='', type=str, help="vocab cache path")
+    parser.add_argument('-t', "--target", default="./result/predict/result.json", type=str, help="predict result file")
+    parser.add_argument('-r', "--ref_file", default="", type=str, help="ref file")
+    parser.add_argument('-d', '--device', default='', type=str, help='indices of GPUs to enable (default: all)')
+    parser.add_argument('-e', '--eval', default=True, action='store_true', help='Whether evaluate the result')
+    parser.add_argument('-f', '--file', default='test', help='run on train/dev/test')
     args = parser.parse_args()
 
     if args.device:

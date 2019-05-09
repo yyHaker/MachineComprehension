@@ -147,28 +147,28 @@ class DuReader(object):
             self.test = data.Dataset(examples=test_examples, fields=test_list_fields)
 
         # build vocab
-        vocab_cache_path = f"{data_path}/{self.config['vocab_cache']}"
-        if not os.path.exists(vocab_cache_path):
-            self.logger.info("build vocab....")
-            # self.CHAR.build_vocab(self.train, self.dev)
-            self.PARAS.build_vocab(self.train.paras_word, self.train.q_word, self.dev.paras_word, self.dev.q_word)
-            self.Q_WORD.vocab = self.PARAS.vocab
+        # vocab_cache_path = f"{data_path}/{self.config['vocab_cache']}"
+        # if not os.path.exists(vocab_cache_path):
+        self.logger.info("build vocab....")
+        # self.CHAR.build_vocab(self.train, self.dev)
+        self.PARAS.build_vocab(self.train.paras_word, self.train.q_word, self.dev.paras_word, self.dev.q_word)
+        self.Q_WORD.vocab = self.PARAS.vocab
 
-            # load pretrained embeddings
-            Vectors = vocab.Vectors(self.config["pretrain_emd_file"])
-            self.PARAS.vocab.load_vectors(Vectors)
+        # load pretrained embeddings
+        Vectors = vocab.Vectors(self.config["pretrain_emd_file"])
+        self.PARAS.vocab.load_vectors(Vectors)
 
-            # save vocab cache
-            self.logger.info("save vocab....")
-            with open(vocab_cache_path, 'wb') as fout:
-                pickle.dump(self.PARAS.vocab, fout)
-        else:
-            # load vocab
-            self.logger.info(f"load vocab from {vocab_cache_path} ....")
-            with open(vocab_cache_path, 'rb') as fin:
-                self.PARAS.vocab = pickle.load(fin)
-                self.WORD.vocab = self.PARAS.vocab
-                self.Q_WORD.vocab = self.PARAS.vocab
+        #     # save vocab cache
+        #     self.logger.info("save vocab....")
+        #     with open(vocab_cache_path, 'wb') as fout:
+        #         pickle.dump(self.PARAS.vocab, fout)
+        # else:
+        #     # load vocab
+        #     self.logger.info(f"load vocab from {vocab_cache_path} ....")
+        #     with open(vocab_cache_path, 'rb') as fin:
+        #         self.PARAS.vocab = pickle.load(fin)
+        #         self.WORD.vocab = self.PARAS.vocab
+        #         self.Q_WORD.vocab = self.PARAS.vocab
 
         # just for call easy
         self.vocab_vectors = self.PARAS.vocab.vectors
