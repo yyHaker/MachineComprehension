@@ -41,20 +41,20 @@ class DuReader(object):
         test_examples_path = processed_dataset_path + f'{self.config["test_file"]}.pt'
 
         # judge if need to preprocess raw data files
-        if not os.path.exists(f'{data_path_process}/{self.config["train_file"]}l'):
-            self.logger.info("preprocess train  data...")
-            self.preprocess(f'{data_path}/{self.config["train_file"]}',
-                            save_path=f'{data_path_process}/{self.config["train_file"]}l')
-
-        if not os.path.exists(f'{data_path_process}/{self.config["dev_file"]}l'):
-            self.logger.info("preprocess dev  data...")
-            self.preprocess(f'{data_path}/{self.config["dev_file"]}',
-                            save_path=f'{data_path_process}/{self.config["dev_file"]}l')
-
-        if not os.path.exists(f'{data_path_process}/{self.config["test_file"]}l'):
-            self.logger.info("preprocess test  data...")
-            self.preprocess(f'{data_path}/{self.config["test_file"]}',
-                            save_path=f'{data_path_process}/{self.config["test_file"]}l', train=False)
+        # if not os.path.exists(f'{data_path_process}/{self.config["train_file"]}l'):
+        #     self.logger.info("preprocess train  data...")
+        #     self.preprocess(f'{data_path}/{self.config["train_file"]}',
+        #                     save_path=f'{data_path_process}/{self.config["train_file"]}l')
+        #
+        # if not os.path.exists(f'{data_path_process}/{self.config["dev_file"]}l'):
+        #     self.logger.info("preprocess dev  data...")
+        #     self.preprocess(f'{data_path}/{self.config["dev_file"]}',
+        #                     save_path=f'{data_path_process}/{self.config["dev_file"]}l')
+        #
+        # if not os.path.exists(f'{data_path_process}/{self.config["test_file"]}l'):
+        #     self.logger.info("preprocess test  data...")
+        #     self.preprocess(f'{data_path}/{self.config["test_file"]}',
+        #                     save_path=f'{data_path_process}/{self.config["test_file"]}l', train=False)
 
         # define Field
         self.logger.info("construct data loader....")

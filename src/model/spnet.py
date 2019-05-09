@@ -17,12 +17,13 @@ INF = 1e30  # 定义正无穷
 
 class SPNet(nn.Module):
     """SPNet"""
-    def __init__(self, args, pretrained):
+    def __init__(self, args, pretrained, trainable_weight_idx):
         super(SPNet, self).__init__()
         self.args = args["arch"]["args"]
 
         # 1. word embedding layer
-        self.word_emb = nn.Embedding.from_pretrained(pretrained, freeze=True)
+        # self.word_emb = nn.Embedding.from_pretrained(pretrained, freeze=True)
+        self.word_emb = PartiallyTrainEmbedding(pretrained, trainable_weight_idx)
 
         # 2. contextual embedding layer
         self.context_lstm = LSTM(input_size=self.args["word_dim"],
@@ -130,37 +131,75 @@ class SPNet(nn.Module):
         # [b, 2*d]  ---> [b*max_p_num, 2*d]
         rq_tile = repeat_tensor(rq, 0, max_p_num)
         # ---> [b*max_p_num, 1]  --> [b, max_p_num]
-        score = F.softmax(self.score_weight_qp(rq_tile, rps).squeeze(-1).view(batch_size, max_p_num), dim=-1)
-
-        # sort by match score
-        # sorted_score, indices = torch.sort(score, dim=-1, descending=True)
+        pr_score = self.score_weight_qp(rq_tile, rps).squeeze(-1).view(batch_size, max_p_num) * paras_mask
 
         # 9. shared LSTM layer (for task2)
-        # [b*max_p_num, max_p_len,  2*d]  ---> [b, max_p_num, max_p_len,  2*d]
-        paras_combine = paras_combine.view(batch_size, max_p_num, max_p_len, -1)
-        # combine all paras   --- > [b, max_p_num*max_p_len,  2*d]
-        paras_combine = paras_combine.view(batch_size, max_p_num*max_p_len, -1)
-        # shared LSTM   ---> [b, max_p_num*max_p_len,  2*d]
-        # [b*max_p_num] -- > [b]
-        paras_lens_sum = torch.sum(paras_lens.view(batch_size, -1), 1)
-        # [b, max_p_num*max_p_len,  2*d]----> [b, max_p_num*max_p_len,  2*d]
-        gp = self.shared_lstm((paras_combine, paras_lens_sum), total_length=paras_combine.shape[1])[0]
-        # print("gp.size: ", gp.size())
-        # 10. pointer network (for task2)
-        # [b, max_p_num*max_p_len, 4*d]---> [b, total_paras_lens]
-        p1 = self.pointer_weight_a1(torch.cat((paras_combine, gp), dim=-1)).squeeze(2)
-        # [b, max_p_num*max_p_len,  2*d]  -----> [b, max_p_num*max_p_len,  2*d]
-        gp2 = self.shared_lstm((gp, paras_lens_sum), total_length=paras_combine.shape[1])[0]
-        # print("p1_size: ", p1.size())
-        p2 = self.pointer_weight_a2(torch.cat((paras_combine, gp2), dim=-1)).squeeze(2)
-        # print("p2_size: ", p2.size())
-        # mask p1 and p2
-        concat_paras_word_mask = paras_word_mask.reshape(batch_size, -1)  # (b, max_para_num*max_p_len)
-        p1 = -INF*(1-concat_paras_word_mask) + p1
-        p2 = -INF*(1-concat_paras_word_mask) + p2
-        # return :
-        # p1, p2:  [b, max_p_num*max_p_len], score: [b, max_p_num]
-        return p1, p2, score
+        if train:
+            # [b*max_p_num, max_p_len,  2*d]  ---> [b, max_p_num, max_p_len,  2*d]
+            paras_combine = paras_combine.view(batch_size, max_p_num, max_p_len, -1)
+            # combine all paras   --- > [b, max_p_num*max_p_len,  2*d]
+            paras_combine = paras_combine.view(batch_size, max_p_num*max_p_len, -1)
+            # shared LSTM   ---> [b, max_p_num*max_p_len,  2*d]
+            # [b*max_p_num] -- > [b]
+            paras_lens_sum = torch.sum(paras_lens.view(batch_size, -1), 1)
+            # [b, max_p_num*max_p_len,  2*d]----> [b, max_p_num*max_p_len,  2*d]
+            gp = self.shared_lstm((paras_combine, paras_lens_sum), total_length=paras_combine.shape[1])[0]
+            # print("gp.size: ", gp.size())
+            # 10. pointer network (for task2)
+            # [b, max_p_num*max_p_len, 4*d]---> [b, total_paras_lens]
+            p1 = self.pointer_weight_a1(torch.cat((paras_combine, gp), dim=-1)).squeeze(2)
+            # [b, max_p_num*max_p_len,  2*d]  -----> [b, max_p_num*max_p_len,  2*d]
+            gp2 = self.shared_lstm((gp, paras_lens_sum), total_length=paras_combine.shape[1])[0]
+            p2 = self.pointer_weight_a2(torch.cat((paras_combine, gp2), dim=-1)).squeeze(2)
+            # mask p1 and p2
+            concat_paras_word_mask = paras_word_mask.reshape(batch_size, -1)  # (b, max_para_num*max_p_len)
+            p1 = -INF*(1-concat_paras_word_mask) + p1
+            p2 = -INF*(1-concat_paras_word_mask) + p2
+            # return :
+            # p1, p2:  [b, max_p_num*max_p_len], score: [b, max_p_num]
+            return p1, p2, pr_score
+        else:
+            # for dev and test, every para have to predict one answer
+            # paras_combine: [b*max_p_num, max_p_len,  2*d]
+            # paras_lens: [b*max_p_num]
+            # gp: ---> [b*max_p_num, max_p_len,  2*d]
+            gp = self.shared_lstm((paras_combine, paras_lens), total_length=paras_combine.shape[1])[0]
+            # -->[b*max_p_num, max_p_len, 4*d]---> [b*max_p_num, max_p_len]
+            p1 = self.pointer_weight_a1(torch.cat((paras_combine, gp), dim=-1)).squeeze(2)
+            # gp2: [b*max_p_num, max_p_len, 2*d]
+            gp2 = self.shared_lstm((gp, paras_lens), total_length=paras_combine.shape[1])[0]
+            # --->[b*max_p_num, max_p_len, 4*d]---> [b*max_p_num, max_p_len]
+            p2 = self.pointer_weight_a2(torch.cat((paras_combine, gp2), dim=-1)).squeeze(2)
+
+            # choose max score*pr_score para
+            # get answer for every para
+            b_multi_para_num, p_len = p1.size()
+            ls = nn.LogSoftmax(dim=1)
+            # (b*max_para_num, c_len, c_len)
+            # 下三角形mask矩阵(保证i<=j)
+            mask = (torch.ones(p_len, p_len) * float('-inf')).to(paras_num.device
+                                                                 ).tril(-1).unsqueeze(0).expand(b_multi_para_num, -1,
+                                                                                                -1)
+            # masked (b*max_para_num, c_len, c_len)
+            score = (ls(p1).unsqueeze(2) + ls(p2).unsqueeze(1)) + mask
+            # s_idx: [b*max_para_num, c_len]
+            score, s_idx = score.max(dim=1)
+            # e_idx: [b*max_para_num], score is for (s_idx, e_idx).
+            score, e_idx = score.max(dim=1)
+            s_idx = torch.gather(s_idx, 1, e_idx.view(-1, 1)).squeeze(-1)
+
+            # reshape
+            s_idx_re = s_idx.reshape(batch_size, -1)
+            e_idx_re = e_idx.reshape(batch_size, -1)
+            score_re = score.reshape(batch_size, -1)
+
+            # choose max  score*pr_score para
+            # mask for answer idx score, calc score product, get best para idx ----> [b]
+            _, best_para_idx = torch.max(score_re * pr_score, dim=-1)
+            # use best idx to choose s_idx and e_idx, s_idx: [b], e_idx:[b]
+            s_idx = torch.gather(s_idx_re, 1, best_para_idx.view(-1, 1)).squeeze(-1)
+            e_idx = torch.gather(e_idx_re, 1, best_para_idx.view(-1, 1)).squeeze(-1)
+            return s_idx, e_idx, best_para_idx
 
 
 

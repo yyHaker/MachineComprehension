@@ -269,6 +269,306 @@ class BiDAFMultiParas(nn.Module):
                                    batch_first=True,
                                    dropout=self.args["dropout"])
 
+        # para ranking (for task 2)
+        self.score_weight_qp = nn.Bilinear(self.args["hidden_size"] * 2, self.args["hidden_size"] * 2, 1)
+
+        # self-align layer for question
+        self.align_weight_q = Linear(self.args["hidden_size"]*2, 1)
+
+        # self-align layer for paras
+        self.align_weight_p = Linear(self.args["hidden_size"]*2, 1)
+
+        # 6. Output Layer
+        self.p1_weight_g = Linear(self.args["hidden_size"] * 8, 1, dropout=self.args["dropout"])
+        self.p1_weight_m = Linear(self.args["hidden_size"] * 2, 1, dropout=self.args["dropout"])
+        self.p2_weight_g = Linear(self.args["hidden_size"] * 8, 1, dropout=self.args["dropout"])
+        self.p2_weight_m = Linear(self.args["hidden_size"] * 2, 1, dropout=self.args["dropout"])
+
+        self.output_LSTM = LSTM(input_size=self.args["hidden_size"] * 2,
+                                hidden_size=self.args["hidden_size"],
+                                bidirectional=True,
+                                batch_first=True,
+                                dropout=self.args["dropout"])
+
+        self.dropout = nn.Dropout(p=self.args["dropout"])
+
+    def forward(self, batch, train=True):
+        # TODO: More memory-efficient architecture
+        def char_emb_layer(x):
+            """
+            :param x: (batch, seq_len, word_len)
+            :return: (batch, seq_len, char_channel_size)
+            """
+            batch_size = x.size(0)
+            # (batch, seq_len, word_len, char_dim)
+            x = self.dropout(self.char_emb(x))
+            # (batch * seq_len, 1, char_dim, word_len)
+            x = x.view(-1, self.args["char_dim"], x.size(2)).unsqueeze(1)
+            # (batch * seq_len, char_channel_size, 1, conv_len) -> (batch * seq_len, char_channel_size, conv_len)
+            x = self.char_conv(x).squeeze(2)
+            # (batch * seq_len, char_channel_size, 1) -> (batch * seq_len, char_channel_size)
+            x = F.max_pool1d(x, x.size(2)).squeeze()
+            # (batch, seq_len, char_channel_size)
+            x = x.view(batch_size, -1, self.args["char_channel_size"])
+
+            return x
+
+        def highway_network(x):
+            """
+            :param x1: (batch, seq_len, char_channel_size)
+            :param x2: (batch, seq_len, word_dim)
+            :return: (batch, seq_len, hidden_size * 2)
+            """
+            # (batch, seq_len, char_channel_size + word_dim)
+            # x = torch.cat([x1, x2], dim=-1)
+            for i in range(2):
+                h = getattr(self, f'highway_linear{i}')(x)
+                g = getattr(self, f'highway_gate{i}')(x)
+                x = g * h + (1 - g) * x
+            # (batch, seq_len, hidden_size * 2)
+            return x
+
+        def att_flow_layer(p, q):
+            """
+            :param p: (batch, p_len, hidden_size * 2)
+            :param q: (batch, q_len, hidden_size * 2)
+            :return: (batch, p_len, q_len)
+            """
+            p_len = p.size(1)
+            q_len = q.size(1)
+
+            # (batch, p_len, q_len, hidden_size * 2)
+            # p_tiled = p.unsqueeze(2).expand(-1, -1, q_len, -1)
+            # (batch, p_len, q_len, hidden_size * 2)
+            # q_tiled = q.unsqueeze(1).expand(-1, p_len, -1, -1)
+            # (batch, p_len, q_len, hidden_size * 2)
+            # pq_tiled = p_tiled * q_tiled
+            # pq_tiled = p.unsqueeze(2).expand(-1, -1, q_len, -1) * q.unsqueeze(1).expand(-1, p_len, -1, -1)
+
+            pq = []
+            for i in range(q_len):
+                # (batch, 1, hidden_size * 2)
+                qi = q.select(1, i).unsqueeze(1)
+                # (batch, p_len, 1)
+                pi = self.att_weight_pq(p * qi).squeeze()
+                pq.append(pi)
+            # (batch, p_len, q_len)
+            pq = torch.stack(pq, dim=-1)
+
+            # (batch, p_len, q_len)
+            s = self.att_weight_p(p).expand(-1, -1, q_len) + \
+                self.att_weight_q(q).permute(0, 2, 1).expand(-1, p_len, -1) + \
+                pq
+
+            # (batch, p_len, q_len)
+            a = F.softmax(s, dim=2)
+            # (batch, p_len, q_len) * (batch, q_len, hidden_size * 2) -> (batch, p_len, hidden_size * 2)
+            p2q_att = torch.bmm(a, q)
+            # (batch, 1, p_len)
+            b = F.softmax(torch.max(s, dim=2)[0], dim=1).unsqueeze(1)
+            # (batch, 1, p_len) * (batch, p_len, hidden_size * 2) -> (batch, hidden_size * 2)
+            q2p_att = torch.bmm(b, p).squeeze()
+            # (batch, p_len, hidden_size * 2) (tiled)
+            q2p_att = q2p_att.unsqueeze(1).expand(-1, p_len, -1)
+            # q2p_att = torch.stack([q2p_att] * p_len, dim=1)
+
+            # (batch, p_len, hidden_size * 8)
+            x = torch.cat([p, p2q_att, p * p2q_att, p * q2p_att], dim=-1)
+            return x
+
+        def output_layer(g, m, l):
+            """
+            :param g: (batch, para_num * p_len, hidden_size * 8)
+            :param m: (batch, para_num * p_len ,hidden_size * 2)
+            :param l: (batch)
+            :return: p1: (batch, para_num * p_len), p2: (batch, para_num * p_len)
+            """
+            # p1: (batch, para_num*p_len)
+            p1 = (self.p1_weight_g(g) + self.p1_weight_m(m)).squeeze()
+            # m2: (batch, para_num*p_len, hidden_size * 2)
+            m2 = self.output_LSTM((m, l), total_length=m.shape[1])[0]
+            # print('In Pointer:', p1.shape, m2.shape)
+            # p2: (batch, para_num*p_len)
+            p2 = (self.p2_weight_g(g) + self.p2_weight_m(m2)).squeeze()
+            return p1, p2
+
+        # 1. Character Embedding Layer
+        # p_char = char_emb_layer(batch.p_char)
+        # q_char = char_emb_layer(batch.q_char)
+
+        # read data
+        q_word, q_lens = batch.q_word[0], batch.q_word[1]  # (b, max_q_len), (b)
+        # ----> (b, max_para_num, max_para_len), (b), (b, max_para_num)
+        paras_word, paras_num, paras_lens = batch.paras_word[0], batch.paras_word[1], batch.paras_word[2]
+        batch_size = paras_word.shape[0]
+        max_para_num = paras_word.shape[1]
+        max_para_len = paras_word.shape[2]
+
+        # build mask matrix
+        paras_mask = seq_mask(paras_num, device=paras_num.device)  # (b, max_para_num)
+        paras_lens_reshape = paras_lens.reshape(-1)  # (b*max_para_num)
+        paras_word_mask = seq_mask(paras_lens_reshape, device=paras_lens_reshape.device
+                                   ).reshape(batch_size, max_para_num, -1)  # (b, max_para_num, max_para_len)
+
+        # ----> (b*max_para_num, max_p_len)
+        paras_word = paras_word.reshape(max_para_num * batch_size, -1)
+        # reshape para_mask: (b, max_para_num) -> (b*max_para_num, 1, 1)
+        reshape_paras_mask = paras_mask.reshape(-1).unsqueeze(1).unsqueeze(1)
+
+        # 2. Word Embedding Layer
+        paras_word = self.word_emb(paras_word)  # [b*max_para_num, max_para_len, d]
+        q_word = self.word_emb(q_word)  # [b, max_q_len, d]
+
+        # Highway network
+        p = highway_network(paras_word)
+        q = highway_network(q_word)
+
+        # 3. Contextual Embedding Layer
+        p = self.context_LSTM((p, paras_lens_reshape))[0]  # (b*max_para_num, max_para__len, d)
+        q = self.context_LSTM((q, q_lens))[0]  # (b, max_q_len, d)
+
+        # duplicate q: (b, max_q_len, d) -> (b, max_para_num, max_q_len, d)   -> (b*max_para_num, max_q_len, d)
+        # mask q
+        q = torch.stack([q for i in range(max_para_num)], dim=1).reshape(-1, q.shape[1], q.shape[2]) * reshape_paras_mask
+        # duplicate q_lens: (b) -> (b*max_para_num)
+        # q_lens = torch.stack([q_lens for i in range(3)], dim=0).reshape(-1) * para_mask * reshape_para_mask
+
+        # 4. Attention Flow Layer
+        # TODO mask on attention
+        g = att_flow_layer(p, q)
+
+        # 5. Modeling Layer
+        # ---> (b*max_para_num, max_p_len, d)
+        m = self.modeling_LSTM2((self.modeling_LSTM1((g, paras_lens_reshape))[0], paras_lens_reshape))[0]
+
+        # 6. Output Layer
+        # concat p: (batch*para_num, p_len, d) -> (batch, para_num*p_len, d)
+        # g:(b*max_para_num, max_para_len, d) -> (b, max_para_num*max_para_len, d)
+        # m:(b*max_para_num, max_para_len, d) -> (b, max_para_num*max_para_len, d)
+        # origin_p_lens:(batch, para_num) -> (batch) last para len + 2 * max_para_num
+        concat_g = g.reshape(batch_size, -1, g.shape[-1])
+        concat_m = m.reshape(batch_size, -1, m.shape[-1])
+        last_para_len = paras_lens[:, -1]
+        concat_paras_lens = max_para_len * 2 + last_para_len
+
+        # for task1: (Para Ranking)
+        # self-align paras
+        # m: (b*max_para_num, max_p_len, 2*d)  ----->  (b*max_para_num, max_p_len)
+        align_weight_p = F.softmax(self.align_weight_p(m).squeeze(2), dim=-1)
+        # [b*max_para_num, 1, max_p_len] * [b*max_para_num, max_p_len,  2*d] ---> [b*max_para_num, 1,  2*d] --> [b*max_para_num, 2*d]
+        rps = torch.bmm(align_weight_p.unsqueeze(1), m).squeeze(1)
+
+        # self-align q
+        # [b, max_q_len, 2*d] ---> [b, max_q_len]
+        align_weight_q = F.softmax(self.align_weight_q(q).squeeze(2), dim=-1)
+        # [b*max_para_num, 1, max_q_len] * [b*max_para_num, max_q_len, 2*d]
+        #           --> [b*max_para_num,1, 2*d ]  --> [b*max_para_num, 2*d]
+        rq = torch.bmm(align_weight_q.unsqueeze(1), q).squeeze(1)
+
+        # match score [b*max_para_num, 1]  --> [b, max_para_num]
+        pr_score = self.score_weight_qp(rq, rps).squeeze(-1).view(batch_size, max_para_num) * paras_mask
+
+        if train:
+            # concat all para to predict answer
+            # (batch, p_len), (batch, p_len)
+            p1, p2 = output_layer(concat_g, concat_m, concat_paras_lens)
+            # mask，将padding位置-inf
+            concat_p_word_mask = paras_word_mask.reshape(paras_word_mask.shape[0], -1)  # (b, max_para_num*max_para_len)
+            p1 = -INF*(1-concat_p_word_mask) + p1
+            p2 = -INF*(1-concat_p_word_mask) + p2
+            return p1, p2, pr_score
+        else:
+            # for dev and test, every para have to predict one answer
+            # g:(b*max_para_num, max_para_len, d)
+            # m:(b*max_para_num, max_para_len, d)
+            # paras_lens_reshape: (b*max_para_num)
+            # p1,p2: [b*max_para_num, p_len]
+            p1, p2 = output_layer(g, m, paras_lens_reshape)
+
+            # get answer for every para
+            b_multi_para_num, p_len = p1.size()
+            ls = nn.LogSoftmax(dim=1)
+            # (b*max_para_num, c_len, c_len)
+            # 下三角形mask矩阵(保证i<=j)
+            mask = (torch.ones(p_len, p_len) * float('-inf')).to(paras_num.device
+                                                                 ).tril(-1).unsqueeze(0).expand(b_multi_para_num, -1, -1)
+            # masked (b*max_para_num, c_len, c_len)
+            score = (ls(p1).unsqueeze(2) + ls(p2).unsqueeze(1)) + mask
+            # s_idx: [b*max_para_num, c_len]
+            score, s_idx = score.max(dim=1)
+            # e_idx: [b*max_para_num], score is for (s_idx, e_idx).
+            score, e_idx = score.max(dim=1)
+            s_idx = torch.gather(s_idx, 1, e_idx.view(-1, 1)).squeeze(-1)
+
+            # reshape
+            s_idx_re = s_idx.reshape(batch_size, max_para_num)
+            e_idx_re = e_idx.reshape(batch_size, max_para_num)
+            score_re = score.reshape(batch_size, max_para_num)
+
+            # choose max  score*pr_score para
+            # mask for answer idx score, calc score product, get best para idx ----> [b]
+            _, best_para_idx = torch.max(score_re * pr_score, dim=-1)
+            # use best idx to choose s_idx and e_idx, s_idx: [b], e_idx:[b]
+            s_idx = torch.gather(s_idx_re, 1, best_para_idx.view(-1, 1)).squeeze(-1)
+            e_idx = torch.gather(e_idx_re, 1, best_para_idx.view(-1, 1)).squeeze(-1)
+
+            return s_idx, e_idx, best_para_idx
+
+
+class BiDAFMultiParasOrigin(nn.Module):
+    """BiDAF on multipal paragraphs"""
+
+    def __init__(self, args, pretrained, trainable_weight_idx):
+        super(BiDAFMultiParasOrigin, self).__init__()
+        self.args = args["arch"]["args"]
+
+        # 1. Character Embedding Layer
+        # self.char_emb = nn.Embedding(self.args["char_vocab_size"], self.args["char_dim"], padding_idx=1)
+        # nn.init.uniform_(self.char_emb.weight, -0.001, 0.001)
+        #
+        # self.char_conv = nn.Conv2d(1, self.args["char_channel_size"],
+        #                            (self.args["char_dim"], self.args["char_channel_width"]))
+
+        # 2. Word Embedding Layer
+        # initialize word embedding with GloVe
+        self.word_emb = PartiallyTrainEmbedding(pretrained, trainable_weight_idx)
+
+        # highway network
+        # assert self.args["hidden_size"] * 2 == (self.args["char_channel_size"] + self.args["word_dim"])
+        self.seq_hidden = self.args["word_dim"]
+        for i in range(2):
+            setattr(self, f'highway_linear{i}',
+                    nn.Sequential(Linear(self.seq_hidden, self.seq_hidden),
+                                  nn.ReLU()))
+            setattr(self, f'highway_gate{i}',
+                    nn.Sequential(Linear(self.seq_hidden, self.seq_hidden),
+                                  nn.Sigmoid()))
+
+        # 3. Contextual Embedding Layer
+        self.context_LSTM = LSTM(input_size=self.seq_hidden,
+                                 hidden_size=self.args["hidden_size"],
+                                 bidirectional=True,
+                                 batch_first=True,
+                                 dropout=self.args["dropout"])
+
+        # 4. Attention Flow Layer
+        self.att_weight_p = Linear(self.args["hidden_size"] * 2, 1)
+        self.att_weight_q = Linear(self.args["hidden_size"] * 2, 1)
+        self.att_weight_pq = Linear(self.args["hidden_size"] * 2, 1)
+
+        # 5. Modeling Layer
+        self.modeling_LSTM1 = LSTM(input_size=self.args["hidden_size"] * 8,
+                                   hidden_size=self.args["hidden_size"],
+                                   bidirectional=True,
+                                   batch_first=True,
+                                   dropout=self.args["dropout"])
+
+        self.modeling_LSTM2 = LSTM(input_size=self.args["hidden_size"] * 2,
+                                   hidden_size=self.args["hidden_size"],
+                                   bidirectional=True,
+                                   batch_first=True,
+                                   dropout=self.args["dropout"])
+
         # 6. Output Layer
         self.p1_weight_g = Linear(self.args["hidden_size"] * 8, 1, dropout=self.args["dropout"])
         self.p1_weight_m = Linear(self.args["hidden_size"] * 2, 1, dropout=self.args["dropout"])
