@@ -292,7 +292,7 @@ class BiDAFMultiParas(nn.Module):
 
         self.dropout = nn.Dropout(p=self.args["dropout"])
 
-    def forward(self, batch):
+    def forward(self, batch, train=True):
         # TODO: More memory-efficient architecture
         def char_emb_layer(x):
             """
@@ -428,6 +428,7 @@ class BiDAFMultiParas(nn.Module):
         q = self.context_LSTM((q, q_lens))[0]  # (b, max_q_len, d)
 
         # duplicate q: (b, max_q_len, d) -> (b, max_para_num, max_q_len, d)   -> (b*max_para_num, max_q_len, d)
+        # mask q
         q = torch.stack([q for i in range(max_para_num)], dim=1).reshape(-1, q.shape[1], q.shape[2]) * reshape_paras_mask
         # duplicate q_lens: (b) -> (b*max_para_num)
         # q_lens = torch.stack([q_lens for i in range(3)], dim=0).reshape(-1) * para_mask * reshape_para_mask
@@ -450,9 +451,9 @@ class BiDAFMultiParas(nn.Module):
         last_para_len = paras_lens[:, -1]
         concat_paras_lens = max_para_len * 2 + last_para_len
 
-        # for para ranking:
+        # for task1: (Para Ranking)
         # self-align paras
-        # m: (b*max_para_num, max_para_len, 2*d)  ----->  (b*max_para_num, max_para_len)
+        # m: (b*max_para_num, max_p_len, 2*d)  ----->  (b*max_para_num, max_p_len)
         align_weight_p = F.softmax(self.align_weight_p(m).squeeze(2), dim=-1)
         # [b*max_para_num, 1, max_p_len] * [b*max_para_num, max_p_len,  2*d] ---> [b*max_para_num, 1,  2*d] --> [b*max_para_num, 2*d]
         rps = torch.bmm(align_weight_p.unsqueeze(1), m).squeeze(1)
@@ -460,17 +461,55 @@ class BiDAFMultiParas(nn.Module):
         # self-align q
         # [b, max_q_len, 2*d] ---> [b, max_q_len]
         align_weight_q = F.softmax(self.align_weight_q(q).squeeze(2), dim=-1)
-        #  [b*max_para_num, 1, max_q_len] * [b*max_para_num, max_q_len, 2*d] --> [b*max_para_num,1, 2*d ]  --> [b*max_para_num, 2*d]
+        # [b*max_para_num, 1, max_q_len] * [b*max_para_num, max_q_len, 2*d]
+        #           --> [b*max_para_num,1, 2*d ]  --> [b*max_para_num, 2*d]
         rq = torch.bmm(align_weight_q.unsqueeze(1), q).squeeze(1)
 
         # match score [b*max_para_num, 1]  --> [b, max_para_num]
-        score = F.softmax(self.score_weight_qp(rq, rps).squeeze(-1).view(batch_size, max_para_num), dim=-1)
+        pr_score = self.score_weight_qp(rq, rps).squeeze(-1).view(batch_size, max_para_num) * paras_mask
 
-        # (batch, p_len), (batch, p_len)
-        p1, p2 = output_layer(concat_g, concat_m, concat_paras_lens)
+        if train:
+            # concat all para to predict answer
+            # (batch, p_len), (batch, p_len)
+            p1, p2 = output_layer(concat_g, concat_m, concat_paras_lens)
+            # mask，将padding位置-inf
+            concat_p_word_mask = paras_word_mask.reshape(paras_word_mask.shape[0], -1)  # (b, max_para_num*max_para_len)
+            p1 = -INF*(1-concat_p_word_mask) + p1
+            p2 = -INF*(1-concat_p_word_mask) + p2
+            return p1, p2, pr_score
+        else:
+            # for dev and test, every para have to predict one answer
+            # g:(b*max_para_num, max_para_len, d)
+            # m:(b*max_para_num, max_para_len, d)
+            # paras_lens_reshape: (b*max_para_num)
+            # p1,p2: [b*max_para_num, p_len]
+            p1, p2 = output_layer(g, m, paras_lens_reshape)
 
-        # mask，将padding位置-inf
-        concat_p_word_mask = paras_word_mask.reshape(paras_word_mask.shape[0], -1)  # (b, max_para_num*max_para_len)
-        p1 = -INF*(1-concat_p_word_mask)+p1
-        p2 = -INF*(1-concat_p_word_mask)+p2
-        return p1, p2, score
+            # get answer for every para
+            b_multi_para_num, p_len = p1.size()
+            ls = nn.LogSoftmax(dim=1)
+            # (b*max_para_num, c_len, c_len)
+            # 下三角形mask矩阵(保证i<=j)
+            mask = (torch.ones(p_len, p_len) * float('-inf')).to(paras_num.device
+                                                                 ).tril(-1).unsqueeze(0).expand(b_multi_para_num, -1, -1)
+            # masked (b*max_para_num, c_len, c_len)
+            score = (ls(p1).unsqueeze(2) + ls(p2).unsqueeze(1)) + mask
+            # s_idx: [b*max_para_num, c_len]
+            score, s_idx = score.max(dim=1)
+            # e_idx: [b*max_para_num], score is for (s_idx, e_idx).
+            score, e_idx = score.max(dim=1)
+            s_idx = torch.gather(s_idx, 1, e_idx.view(-1, 1)).squeeze(-1)
+
+            # reshape
+            s_idx_re = s_idx.reshape(batch_size, max_para_num)
+            e_idx_re = e_idx.reshape(batch_size, max_para_num)
+            score_re = score.reshape(batch_size, max_para_num)
+
+            # choose max  score*pr_score para
+            # mask for answer idx score, calc score product, get best para idx ----> [b]
+            _, best_para_idx = torch.max(score_re * pr_score, dim=-1)
+            # use best idx to choose s_idx and e_idx, s_idx: [b], e_idx:[b]
+            s_idx = torch.gather(s_idx_re, 1, best_para_idx.view(-1, 1)).squeeze(-1)
+            e_idx = torch.gather(e_idx_re, 1, best_para_idx.view(-1, 1)).squeeze(-1)
+
+            return s_idx, e_idx, best_para_idx

@@ -80,6 +80,7 @@ class Trainer(BaseTrainer):
             # use single para
             # s_idx = data.s_idx
             # e_idx = data.e_idx
+
             # calc loss
             lamda = self.config["loss"]["lamda"]
             loss = self.loss(p1, s_idx) + self.loss(p2, e_idx) + lamda * self.loss(score, data.answer_para_idx)
@@ -124,49 +125,74 @@ class Trainer(BaseTrainer):
             The validation metrics in log must have the key 'val_metrics'.
         """
         self.model.eval()
-        total_loss = 0.
+        total_acc = 0.
         preds = []
         with torch.no_grad():
             self.data_loader.eval_iter.device = self.device
             for batch_idx, data in enumerate(self.data_loader.eval_iter):
-                p1, p2, score = self.model(data)
+                s_idx, e_idx, best_para_idx = self.model(data, train=False)
                 # p1, p2 = self.model(data)
                 # use multi para
-                max_p_len = data.paras_word[0].shape[2]
-                s_idx = data.s_idx + data.answer_para_idx * max_p_len
-                e_idx = data.e_idx + data.answer_para_idx * max_p_len
+                # max_p_len = data.paras_word[0].shape[2]
+                # s_idx = data.s_idx + data.answer_para_idx * max_p_len
+                # e_idx = data.e_idx + data.answer_para_idx * max_p_len
 
                 # use single para
                 # s_idx = data.s_idx
                 # e_idx = data.e_idx
 
-                lamda = self.config["loss"]["lamda"]
+                # lamda = self.config["loss"]["lamda"]
                 # loss = self.loss(p1, s_idx) + self.loss(p2, e_idx)
-                loss = self.loss(p1, s_idx) + self.loss(p2, e_idx) + lamda * self.loss(score, data.answer_para_idx)
+                # loss = self.loss(p1, s_idx) + self.loss(p2, e_idx) + lamda * self.loss(score, data.answer_para_idx)
 
                 # add scalar to writer
-                global_step = (epoch - 1) * len(self.data_loader.dev) + batch_idx
-                self.writer.add_scalar('eval_loss', loss.item(), global_step=global_step)
+                # global_step = (epoch - 1) * len(self.data_loader.dev) + batch_idx
+                # self.writer.add_scalar('eval_loss', loss.item(), global_step=global_step)
 
-                total_loss += loss.item() * p1.size()[0]
+                # total_loss += loss.item() * p1.size()[0]
 
                 # 统计得到的answers
                 # (batch, c_len, c_len)
-                batch_size, c_len = p1.size()
-                ls = nn.LogSoftmax(dim=1)
-                mask = (torch.ones(c_len, c_len) * float('-inf')).to(self.device).tril(-1).unsqueeze(0).expand(batch_size, -1, -1)
-                score = (ls(p1).unsqueeze(2) + ls(p2).unsqueeze(1)) + mask
-                score, s_idx = score.max(dim=1)
-                score, e_idx = score.max(dim=1)
-                s_idx = torch.gather(s_idx, 1, e_idx.view(-1, 1)).squeeze()
+                # batch_size, c_len = p1.size()
+                # ls = nn.LogSoftmax(dim=1)
+                # # 下三角形mask矩阵(保证i<=j)
+                # mask = (torch.ones(c_len, c_len) * float('-inf')).to(self.device).tril(-1).unsqueeze(0).expand(batch_size, -1, -1)
+                # # masked (batch, c_len, c_len)
+                # score = (ls(p1).unsqueeze(2) + ls(p2).unsqueeze(1)) + mask
+                # # s_idx: [batch, c_len]
+                # score, s_idx = score.max(dim=1)
+                # # e_idx: [batch], score is for (s_idx, e_idx).
+                # score, e_idx = score.max(dim=1)
+                # s_idx = torch.gather(s_idx, 1, e_idx.view(-1, 1)).squeeze()
 
                 # for multiple para,  (batch, max_para_num, max_p_len)
-                concat_paras_words_idx = data.paras_word[0].reshape(data.paras_word[0].shape[0], -1)
+                # concat_paras_words_idx = data.paras_word[0].reshape(data.paras_word[0].shape[0], -1)
                 # for single para
-                # p_word, p_num, p_lens = data.paras_word[0], data.paras_word[1], data.paras_word[2]  # (batch, max_para_num, max_p_len), (batch), (batch, max_para_num)
+                # (batch, max_para_num, max_p_len), (batch), (batch, max_para_num)
+                # p_word, p_num, p_lens = data.paras_word[0], data.paras_word[1], data.paras_word[2]
                 # c_word = torch.cat([torch.index_select(p, 0, i).unsqueeze(0) for p, i in zip(p_word, data.answer_para_idx)])  # (batch, 1, max_p_len)
                 # c_word = c_word.squeeze(1)  # (batch, max_p_len)
                 # concat_paras_words_idx = c_word
+
+                # get batch_size
+                batch_size = s_idx.size()[0]
+                # calc para choose accuracy
+                acc = float(torch.sum(torch.eq(best_para_idx, data.answer_para_idx))) / (batch_size + 0.0)
+
+                # add scalar to writer
+                global_step = (epoch - 1) * len(self.data_loader.dev) + batch_idx
+                self.writer.add_scalar('eval_para_acc', acc, global_step=global_step)
+                total_acc += acc * batch_size
+
+                # use para idx to get para
+                # (batch, max_para_num, max_p_len), (batch), (batch, max_para_num)
+                paras_word, paras_num, paras_lens = data.paras_word[0], data.paras_word[1], data.paras_word[2]
+                # ---> (batch, 1, max_p_len)
+                p_word = torch.cat([torch.index_select(p, 0, i).unsqueeze(0) for p, i in zip(paras_word, best_para_idx)])
+                # -----> (batch, max_p_len)
+                p_word = p_word.squeeze(1)
+                concat_paras_words_idx = p_word
+
                 for i in range(batch_size):
                     pred = {}
                     # get question id, answer, question
@@ -184,8 +210,8 @@ class Trainer(BaseTrainer):
                     preds.append(pred)
 
         # calc loss
-        val_loss = total_loss / (len(self.data_loader.dev) + 0.)
-        self.logger.info('Val Epoch: {}, loss: {:.6f}'.format(epoch, val_loss))
+        val_acc = total_acc / (len(self.data_loader.dev) + 0.)
+        self.logger.info('Val Epoch: {}, para acc: {:.6f}'.format(epoch, val_acc))
         # evaluate (F1 and Rouge_L)
         predict_file = self.config["trainer"]["prediction_file"]
         ensure_dir(os.path.split(predict_file)[0])

@@ -100,7 +100,7 @@ def split_list(alist, word):
 
 def seq_mask(seq_len, device, max_len=None):
     '''
-    :param seq_len:
+    :param seq_len: [b]
     :param device:
     :param max_len:
     :return: mask matrix
