@@ -106,4 +106,10 @@ def preprocessd(path, save_path, train=True):
 if __name__ == '__main__':
     path = sys.argv[1]
     save_path = sys.argv[2]
-    preprocessd(path, save_path)
+    train = sys.argv[3]
+    if train == '0':
+        train = False
+    else:
+        train = True
+    print(train)
+    preprocessd(path, save_path, train=train)

@@ -24,8 +24,6 @@ def preprocessd_multi_para(path, save_path, train=True):
     datas = []
     with open(path, 'r', encoding="utf-8") as f:
         for idx, line in enumerate(f):
-            if (idx + 1) % 10 == 0:
-                print("processed: {}".format(idx + 1))
             sample = json.loads(line.strip())
             # just pass for no answer sample.(for train)
             if train:
@@ -51,6 +49,9 @@ def preprocessd_multi_para(path, save_path, train=True):
                     = find_fake_answer_from_multi_paras(sample, data["paragraphs"])
             if not train or data['match_score'] != 0:
                 datas.append(data)
+            if (idx + 1) % 1000 == 0:
+                print("processed: {}".format(idx + 1))
+                print("data len: {}".format(len(datas)))
     # write to processed data file
     print("processed done! write to file!")
     with codecs.open(save_path, "w", encoding="utf-8") as f_out:
@@ -63,4 +64,10 @@ def preprocessd_multi_para(path, save_path, train=True):
 if __name__ == '__main__':
     path = sys.argv[1]
     save_path = sys.argv[2]
-    preprocessd_multi_para(path, save_path)
+    train = sys.argv[3]
+    if train == '0':
+        train = False
+    else:
+        train = True
+    print(train)
+    preprocessd_multi_para(path, save_path, train=train)
