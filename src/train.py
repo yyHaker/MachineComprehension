@@ -19,6 +19,9 @@ import model as module_arch
 import loss.loss as module_loss
 import metric.metric as module_metric
 from trainer import Trainer
+
+import random
+import numpy as np
 from utils import ensure_dir
 import codecs
 
@@ -68,6 +71,8 @@ if __name__ == '__main__':
                         help='indices of GPUs to enable (default: all)')
     parser.add_argument('-n', '--name', default=None, type=str,
                         help='the path name to save model')
+    parser.add_argument('-s', '--seed', default=123, type=int,
+                        help='Random seed')
     args = parser.parse_args()
 
     if args.device:
@@ -94,6 +99,11 @@ if __name__ == '__main__':
     console_handler.setLevel(logging.INFO)
     console_handler.setFormatter(formatter)
     logger.addHandler(console_handler)
+
+    # set random seed
+    random.seed(args.seed)
+    np.random.seed(args.seed)
+    torch.manual_seed(args.seed)
 
     logger.info('Run with config:')
     logger.info(json.dumps(config, indent=True))
