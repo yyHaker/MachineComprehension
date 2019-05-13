@@ -40,8 +40,20 @@ def predict(args):
     model_path = os.path.join(args.path, args.model)
     state = torch.load(model_path)
     config = state["config"]   # test file path is in config.json
+
+    logger.info('Best result on dev is {}'.format(state['monitor_best']))
     config['data_loader']['args']['dev_batch_size'] = args.batch_size
     state_dict = state["state_dict"]
+
+    # set test_file
+    if not args.test_file:
+        raise AssertionError('You should spacify the test file name (like search.test1.json)')
+    else:
+        config['data_loader']['args']['test_file'] = args.test_file
+
+    logger.info('Run with config:')
+    logger.info(json.dumps(config, indent=True))
+    
     # setup data_loader instances
     data_loader = getattr(module_data, config['data_loader']['type'])(config)
 
@@ -64,8 +76,8 @@ def predict(args):
         # data_loader.test_iter.device = device
         data_iter = data_loader.eval_iter if args.on_dev else data_loader.test_iter
         for batch_idx, data in enumerate(data_iter):
-            # p1, p2, score = model(data)
-            p1, p2 = model(data)
+            p1, p2, score = model(data)
+            # p1, p2 = model(data)
             # 统计得到的answers
             # (batch, c_len, c_len)
             batch_size, c_len = p1.size()
@@ -126,7 +138,10 @@ if __name__ == '__main__':
     parser.add_argument('-b', '--batch_size', default=64, type=int, help='batch_size')
     parser.add_argument('-p', "--path", default="./result/dureader/saved", type=str, help="best model directory")
     parser.add_argument('-m', '--model', default=None, type=str, help="best model name(.pth)")
-    parser.add_argument('-t', "--target", default="./result/predict/result.json", type=str, help="prediction result file")
+    parser.add_argument('-t', "--target", default="./result/predict/result.json", type=str,
+                        help="prediction result file")
+    parser.add_argument("--test_file", default="", type=str,
+                        help="prediction result file")
     parser.add_argument('-d', '--device', default=None, type=str, help='indices of GPUs to enable (default: all)')
     parser.add_argument('--on_dev', default=False, action='store_true', help='Whether get pred_result on dev')
     args = parser.parse_args()
