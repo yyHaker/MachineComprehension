@@ -15,11 +15,11 @@ import nltk
 import jieba
 import torch
 
-spacy_en = spacy.load('en')
-
-
-def tokenizer(text):
-    return [tok.text for tok in spacy_en.tokenizer(text.strip())]
+# spacy_en = spacy.load('en')
+#
+#
+# def tokenizer(text):
+#     return [tok.text for tok in spacy_en.tokenizer(text.strip())]
 
 
 def CN_tokenizer(text):
@@ -170,7 +170,7 @@ if __name__ == "__main__":
     sent = "I want to watch tv in living room"
     text2 = "网站赌博输钱报警有吗"
     print(CN_tokenizer(text2))
-    print(tokenizer(sent))
+    # print(tokenizer(sent))
 
     a = ["a", "<sep>", "b", "c", "<sep>", "hjlo", "Hi", "<sep>"]
     res = split_list(a, "<sep>")
