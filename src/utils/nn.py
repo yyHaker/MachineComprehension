@@ -93,3 +93,26 @@ class PartiallyTrainEmbedding(nn.Module):
         self.weight[self.trainable_weight_idx] = self.trainable_weight
         return torch.nn.functional.embedding(
             inp, self.weight, None, None, 2.0, False, False)
+
+
+class PartiallyTrainEmbedding2(torch.nn.Module):
+    def __init__(self, weight, trainable_weight_idx):
+        super().__init__()
+        self.num_to_learn = trainable_weight_idx.shape[0]
+        self.trainable_weight_idx = trainable_weight_idx
+        torch.nn.init.kaiming_uniform_(weight[trainable_weight_idx])
+        self.weight = torch.nn.Parameter(weight)
+        # print(weight.shape)
+        learnable_mask = torch.zeros(weight.shape[0])
+        # print(learnable_mask.shape)
+        learnable_mask[trainable_weight_idx] = 1
+        learnable_mask = learnable_mask.unsqueeze(1)
+        self.register_buffer('learnable_mask', learnable_mask)
+
+    def forward(self, inp):
+        def zero_grad_fixed(gr):
+            return gr * self.learnable_mask
+
+        self.weight.register_hook(zero_grad_fixed)
+        return torch.nn.functional.embedding(
+            inp, self.weight, None, None, 2.0, False, False)

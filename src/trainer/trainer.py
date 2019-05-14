@@ -79,6 +79,7 @@ class Trainer(BaseTrainer):
                 p1, p2 = self.model(input_data)
             else:
                 p1, p2, score = self.model(input_data)
+
             # p1, p2 = self.model(data)
             self.optimizer.zero_grad()
             # 计算s_idx, e_idx在多个para连接时的绝对值
@@ -97,8 +98,24 @@ class Trainer(BaseTrainer):
             else:
                 loss = (1 - lamda) * (self.loss(p1, s_idx) + self.loss(p2, e_idx)) + lamda * self.loss(score,
                                                                                                        data.answer_para_idx)
+            # # 验证词向量是否部分训练
+            # sep_idx = self.data_loader.vocab.stoi['<sep>']
+            # eop_idx = self.data_loader.vocab.stoi['<eop>']
+            #
+            # fix_ebd = data.q_word[0][0][:4]
+            # self.logger.info('Train ebd before:')
+            # self.logger.info(self.model.module.word_emb(torch.tensor([sep_idx, eop_idx], device=torch.device('cuda:0'))))
+            # self.logger.info('Fix ebd before:')
+            # self.logger.info(self.model.module.word_emb(fix_ebd))
+
             loss.backward()
             self.optimizer.step()
+
+            # self.logger.info('Train ebd after:')
+            # self.logger.info(
+            #     self.model.module.word_emb(torch.tensor([sep_idx, eop_idx], device=torch.device('cuda:0'))))
+            # self.logger.info('Fix ebd after:')
+            # self.logger.info(self.model.module.word_emb(fix_ebd))
 
             total_loss += loss.item() * p1.size()[0]
             if batch_idx % self.log_step == 0:

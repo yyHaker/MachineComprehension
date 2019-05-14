@@ -11,7 +11,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from utils.nn import Linear, LSTM, PartiallyTrainEmbedding
+from utils.nn import Linear, LSTM, PartiallyTrainEmbedding, PartiallyTrainEmbedding2
 from utils.util import log_softmax_mask, seq_mask
 
 import logging
@@ -233,6 +233,7 @@ class BiDAFMultiParas(nn.Module):
         # 2. Word Embedding Layer
         # self.word_emb = nn.Embedding.from_pretrained(pretrained, freeze=True)
         self.word_emb = PartiallyTrainEmbedding(pretrained, trainable_weight_idx)
+        # self.word_emb = NewPartiallyTrainEmbedding(pretrained, trainable_weight_idx)
 
         # highway network
         # assert self.args["hidden_size"] * 2 == (self.args["char_channel_size"] + self.args["word_dim"])
