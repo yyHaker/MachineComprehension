@@ -546,11 +546,7 @@ class BiDAFMultiParasFixEbd(nn.Module):
         #                            (self.args["char_dim"], self.args["char_channel_width"]))
 
         # 2. Word Embedding Layer
-        # self.word_emb = nn.Embedding.from_pretrained(pretrained, freeze=True)
-        vocab_size = pretrained.size(0)
-        self.embedding_size = pretrained.size(1)
-        self.word_emb = nn.Embedding(vocab_size, self.embedding_size)
-        self.word_emb.weight = nn.Parameter(pretrained)  # 使用预训练词向量
+        self.word_emb = nn.Embedding.from_pretrained(pretrained, freeze=True)
         # self.word_emb = PartiallyTrainEmbedding(pretrained, trainable_weight_idx)
 
         # highway network
