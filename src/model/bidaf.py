@@ -293,7 +293,7 @@ class BiDAFMultiParas(nn.Module):
 
         self.dropout = nn.Dropout(p=self.args["dropout"])
 
-    def forward(self, batch, train=True):
+    def forward(self, input_data, train=True):
         # TODO: More memory-efficient architecture
         def char_emb_layer(x):
             """
@@ -398,17 +398,18 @@ class BiDAFMultiParas(nn.Module):
         # q_char = char_emb_layer(batch.q_char)
 
         # read data
-        q_word, q_lens = batch.q_word[0], batch.q_word[1]  # (b, max_q_len), (b)
+        q_word, q_lens = input_data['q_word'], input_data['q_lens']  # (b, max_q_len), (b)
         # ----> (b, max_para_num, max_para_len), (b), (b, max_para_num)
-        paras_word, paras_num, paras_lens = batch.paras_word[0], batch.paras_word[1], batch.paras_word[2]
+        paras_word, paras_num, paras_lens = input_data['paras_word'], input_data['paras_num'], input_data['paras_lens']
+        # self.logger.info(f'input: {q_word.shape}, {q_lens.shape}, {paras_word.shape}, {paras_num.shape}, {paras_lens.shape}')
         batch_size = paras_word.shape[0]
         max_para_num = paras_word.shape[1]
         max_para_len = paras_word.shape[2]
 
         # build mask matrix
-        paras_mask = seq_mask(paras_num, device=paras_num.device)  # (b, max_para_num)
+        paras_mask = seq_mask(paras_num, device=paras_num.device, max_len=max_para_num)  # (b, max_para_num)
         paras_lens_reshape = paras_lens.reshape(-1)  # (b*max_para_num)
-        paras_word_mask = seq_mask(paras_lens_reshape, device=paras_lens_reshape.device
+        paras_word_mask = seq_mask(paras_lens_reshape, device=paras_lens_reshape.device, max_len=max_para_len
                                    ).reshape(batch_size, max_para_num, -1)  # (b, max_para_num, max_para_len)
 
         # ----> (b*max_para_num, max_p_len)
@@ -417,6 +418,10 @@ class BiDAFMultiParas(nn.Module):
         reshape_paras_mask = paras_mask.reshape(-1).unsqueeze(1).unsqueeze(1)
 
         # 2. Word Embedding Layer
+        # self.logger.info(f'Input Data Device:{q_word.device}')
+        # self.logger.info(f'Inpur Data Shape:{q_word.shape}')
+        # self.logger.info(f'Embedding weight Device:{self.word_emb.weight.device}')
+
         paras_word = self.word_emb(paras_word)  # [b*max_para_num, max_para_len, d]
         q_word = self.word_emb(q_word)  # [b, max_q_len, d]
 
@@ -425,22 +430,27 @@ class BiDAFMultiParas(nn.Module):
         q = highway_network(q_word)
 
         # 3. Contextual Embedding Layer
-        p = self.context_LSTM((p, paras_lens_reshape))[0]  # (b*max_para_num, max_para__len, d)
-        q = self.context_LSTM((q, q_lens))[0]  # (b, max_q_len, d)
+        p = self.context_LSTM((p, paras_lens_reshape), total_length=p.shape[1])[0]  # (b*max_para_num, max_para__len, d)
+        q = self.context_LSTM((q, q_lens), total_length=q.shape[1])[0]  # (b, max_q_len, d)
 
         # duplicate q: (b, max_q_len, d) -> (b, max_para_num, max_q_len, d)   -> (b*max_para_num, max_q_len, d)
         # mask q
-        q = torch.stack([q for i in range(max_para_num)], dim=1).reshape(-1, q.shape[1], q.shape[2]) * reshape_paras_mask
+        q = torch.stack([q for i in range(max_para_num)], dim=1).reshape(-1, q.shape[1],
+                                                                         q.shape[2]) * reshape_paras_mask
         # duplicate q_lens: (b) -> (b*max_para_num)
         # q_lens = torch.stack([q_lens for i in range(3)], dim=0).reshape(-1) * para_mask * reshape_para_mask
+        # self.logger.info(f'after dup: {q.shape}, {p.shape}')
 
         # 4. Attention Flow Layer
         # TODO mask on attention
-        g = att_flow_layer(p, q)
-
+        g = att_flow_layer(p, q)  # (b*max_para_num, max_p_len, d)
+        # self.logger.info(f'g:{g.reshape}')
         # 5. Modeling Layer
         # ---> (b*max_para_num, max_p_len, d)
-        m = self.modeling_LSTM2((self.modeling_LSTM1((g, paras_lens_reshape))[0], paras_lens_reshape))[0]
+        m = self.modeling_LSTM2(
+            (self.modeling_LSTM1((g, paras_lens_reshape), total_length=g.shape[1])[0],
+             paras_lens_reshape), total_length=g.shape[1])[0]
+        # self.logger.info(f'm:{m.shape}')
 
         # 6. Output Layer
         # concat p: (batch*para_num, p_len, d) -> (batch, para_num*p_len, d)
@@ -451,6 +461,7 @@ class BiDAFMultiParas(nn.Module):
         concat_m = m.reshape(batch_size, -1, m.shape[-1])
         last_para_len = paras_lens[:, -1]
         concat_paras_lens = max_para_len * 2 + last_para_len
+        # self.logger.info(f'concat: {concat_g.shape},{concat_m.shape},{concat_paras_lens.shape}')
 
         # for task1: (Para Ranking)
         # self-align paras
@@ -476,8 +487,9 @@ class BiDAFMultiParas(nn.Module):
             p1, p2 = output_layer(concat_g, concat_m, concat_paras_lens)
             # mask，将padding位置-inf
             concat_p_word_mask = paras_word_mask.reshape(paras_word_mask.shape[0], -1)  # (b, max_para_num*max_para_len)
-            p1 = -INF*(1-concat_p_word_mask) + p1
-            p2 = -INF*(1-concat_p_word_mask) + p2
+            # self.logger.info(f'p1:{p1.shape}, p2:{p2.shape}, mask:{concat_p_word_mask.shape}')
+            p1 = -INF * (1 - concat_p_word_mask) + p1
+            p2 = -INF * (1 - concat_p_word_mask) + p2
             return p1, p2, pr_score
         else:
             # for dev and test, every para have to predict one answer
@@ -493,7 +505,8 @@ class BiDAFMultiParas(nn.Module):
             # (b*max_para_num, c_len, c_len)
             # 下三角形mask矩阵(保证i<=j)
             mask = (torch.ones(p_len, p_len) * float('-inf')).to(paras_num.device
-                                                                 ).tril(-1).unsqueeze(0).expand(b_multi_para_num, -1, -1)
+                                                                 ).tril(-1).unsqueeze(0).expand(b_multi_para_num, -1,
+                                                                                                -1)
             # masked (b*max_para_num, c_len, c_len)
             score = (ls(p1).unsqueeze(2) + ls(p2).unsqueeze(1)) + mask
             # s_idx: [b*max_para_num, c_len]
@@ -704,18 +717,18 @@ class BiDAFMultiParasFixEbd(nn.Module):
         # q_char = char_emb_layer(batch.q_char)
 
         # read data
-
         q_word, q_lens = input_data['q_word'], input_data['q_lens']  # (b, max_q_len), (b)
         # ----> (b, max_para_num, max_para_len), (b), (b, max_para_num)
         paras_word, paras_num, paras_lens = input_data['paras_word'], input_data['paras_num'], input_data['paras_lens']
+        # self.logger.info(f'input: {q_word.shape}, {q_lens.shape}, {paras_word.shape}, {paras_num.shape}, {paras_lens.shape}')
         batch_size = paras_word.shape[0]
         max_para_num = paras_word.shape[1]
         max_para_len = paras_word.shape[2]
 
         # build mask matrix
-        paras_mask = seq_mask(paras_num, device=paras_num.device)  # (b, max_para_num)
+        paras_mask = seq_mask(paras_num, device=paras_num.device, max_len=max_para_num)  # (b, max_para_num)
         paras_lens_reshape = paras_lens.reshape(-1)  # (b*max_para_num)
-        paras_word_mask = seq_mask(paras_lens_reshape, device=paras_lens_reshape.device
+        paras_word_mask = seq_mask(paras_lens_reshape, device=paras_lens_reshape.device, max_len=max_para_len
                                    ).reshape(batch_size, max_para_num, -1)  # (b, max_para_num, max_para_len)
 
         # ----> (b*max_para_num, max_p_len)
@@ -744,14 +757,18 @@ class BiDAFMultiParasFixEbd(nn.Module):
         q = torch.stack([q for i in range(max_para_num)], dim=1).reshape(-1, q.shape[1], q.shape[2]) * reshape_paras_mask
         # duplicate q_lens: (b) -> (b*max_para_num)
         # q_lens = torch.stack([q_lens for i in range(3)], dim=0).reshape(-1) * para_mask * reshape_para_mask
+        # self.logger.info(f'after dup: {q.shape}, {p.shape}')
 
         # 4. Attention Flow Layer
         # TODO mask on attention
-        g = att_flow_layer(p, q)
-
+        g = att_flow_layer(p, q) # (b*max_para_num, max_p_len, d)
+        # self.logger.info(f'g:{g.reshape}')
         # 5. Modeling Layer
         # ---> (b*max_para_num, max_p_len, d)
-        m = self.modeling_LSTM2((self.modeling_LSTM1((g, paras_lens_reshape), total_length=g.shape[1])[0], paras_lens_reshape), total_length=g.shape[1])[0]
+        m = self.modeling_LSTM2(
+            (self.modeling_LSTM1((g, paras_lens_reshape), total_length=g.shape[1])[0],
+             paras_lens_reshape), total_length=g.shape[1])[0]
+        # self.logger.info(f'm:{m.shape}')
 
         # 6. Output Layer
         # concat p: (batch*para_num, p_len, d) -> (batch, para_num*p_len, d)
@@ -762,6 +779,7 @@ class BiDAFMultiParasFixEbd(nn.Module):
         concat_m = m.reshape(batch_size, -1, m.shape[-1])
         last_para_len = paras_lens[:, -1]
         concat_paras_lens = max_para_len * 2 + last_para_len
+        # self.logger.info(f'concat: {concat_g.shape},{concat_m.shape},{concat_paras_lens.shape}')
 
         # for task1: (Para Ranking)
         # self-align paras
@@ -787,6 +805,7 @@ class BiDAFMultiParasFixEbd(nn.Module):
             p1, p2 = output_layer(concat_g, concat_m, concat_paras_lens)
             # mask，将padding位置-inf
             concat_p_word_mask = paras_word_mask.reshape(paras_word_mask.shape[0], -1)  # (b, max_para_num*max_para_len)
+            # self.logger.info(f'p1:{p1.shape}, p2:{p2.shape}, mask:{concat_p_word_mask.shape}')
             p1 = -INF*(1-concat_p_word_mask) + p1
             p2 = -INF*(1-concat_p_word_mask) + p2
             return p1, p2, pr_score
@@ -1006,9 +1025,9 @@ class BiDAFMultiParasOrigin(nn.Module):
         max_para_num = p_word.shape[1]
         max_p_len = p_word.shape[2]
         # build mask matrix
-        para_mask = seq_mask(p_num, device=p_num.device)  # (batch, para_num)
+        para_mask = seq_mask(p_num, device=p_num.device, max_len=p_word.shape[1])  # (batch, para_num)
         p_lens_reshape = p_lens.reshape(-1)  # (batch*para_num)
-        p_word_mask = seq_mask(p_lens_reshape, device=p_lens_reshape.device).reshape(p_lens.shape[0], p_lens.shape[1],
+        p_word_mask = seq_mask(p_lens_reshape, device=p_lens_reshape.device, max_len=p_word.shape[2]).reshape(p_lens.shape[0], p_lens.shape[1],
                                                                                      -1)  # (batch, para_num, p_len)
         # resghape p: (batch, para_num, p_len) -> (batch*para_num, p_len)
         # reshape para_mask: (batch, para_num) -> (batch*para_num, 1, 1)
