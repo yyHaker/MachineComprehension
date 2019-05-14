@@ -179,12 +179,12 @@ class DuReader(object):
 
         self.train_iter = data.BucketIterator(dataset=self.train,
                                               batch_size=self.config["train_batch_size"],
-                                              device=self.config["device"],
+                                              device=-1,
                                               shuffle=True)
 
         self.eval_iter = data.BucketIterator(dataset=self.dev,
                                              batch_size=self.config["dev_batch_size"],
-                                             device=self.config["device"],
+                                             device=-1,
                                              sort_key=lambda x: max([max(para_len) for para_len in x.paras_word[2]]),
                                              sort_within_batch=False,
                                              shuffle=False)
@@ -193,7 +193,7 @@ class DuReader(object):
                                              batch_size=self.config["dev_batch_size"],
                                              sort_key=lambda x: max([max(para_len) for para_len in x.paras_word[2]]),
                                              sort_within_batch=False,
-                                             device=self.config["device"],
+                                             device=-1,
                                              shuffle=False)
 
     def preprocess(self, path, save_path, train=True):

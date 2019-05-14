@@ -71,16 +71,20 @@ class Trainer(BaseTrainer):
         # begin train
         self.data_loader.train_iter.device = self.device
         for batch_idx, data in enumerate(self.data_loader.train_iter):
-            if self.config["arch"]["type"] == "BiDAFMultiParas":
-                p1, p2, score = self.model(data)
-            elif self.config["arch"]["type"] == "BiDAFMultiParasOrigin":
-                p1, p2 = self.model(data)
+            # self.logger.info(self.model.module.word_emb.weight.device)
+            # self.logger.info(data.q_word[0].device)
+            # self.logger.info(self.device)
+            input_data, label = self.build_data(data)
+            if self.config["arch"]["type"] == "BiDAFMultiParasOrigin":
+                p1, p2 = self.model(input_data)
+            else:
+                p1, p2, score = self.model(input_data)
             # p1, p2 = self.model(data)
             self.optimizer.zero_grad()
             # 计算s_idx, e_idx在多个para连接时的绝对值
-            max_p_len = data.paras_word[0].shape[2]
-            s_idx = data.s_idx + data.answer_para_idx * max_p_len
-            e_idx = data.e_idx + data.answer_para_idx * max_p_len
+            max_p_len = input_data['paras_word'].shape[2]
+            s_idx = label['s_idx'] + label['answer_para_idx'] * max_p_len
+            e_idx = label['e_idx'] + label['answer_para_idx'] * max_p_len
 
             # use single para
             # s_idx = data.s_idx
@@ -88,10 +92,11 @@ class Trainer(BaseTrainer):
 
             # calc loss
             lamda = self.config["loss"]["lamda"]
-            if self.config["arch"]["type"] == "BiDAFMultiParas":
-                loss = (1 - lamda) * (self.loss(p1, s_idx) + self.loss(p2, e_idx)) + lamda * self.loss(score, data.answer_para_idx)
-            else:
+            if self.config["arch"]["type"] == "BiDAFMultiParasOrigin":
                 loss = self.loss(p1, s_idx) + self.loss(p2, e_idx)
+            else:
+                loss = (1 - lamda) * (self.loss(p1, s_idx) + self.loss(p2, e_idx)) + lamda * self.loss(score,
+                                                                                                       data.answer_para_idx)
             loss.backward()
             self.optimizer.step()
 
@@ -143,19 +148,18 @@ class Trainer(BaseTrainer):
         with torch.no_grad():
             self.data_loader.eval_iter.device = self.device
             for batch_idx, data in enumerate(self.data_loader.eval_iter):
+                input_data, label = self.build_data(data)
                 # s_idx, e_idx, best_para_idx = self.model(data, train=False)
-                if self.config["arch"]["type"] == "BiDAFMultiParas":
-                    p1, p2, score = self.model(data)
+                if self.config["arch"]["type"] == "BiDAFMultiParasOrigin":
+                    p1, p2 = self.model(input_data)
+                else:
+                    p1, p2, score = self.model(input_data)
                     # get pred ans para idx
                     pred_para_idx_tensor = torch.argmax(F.softmax(score, dim=1), dim=1)
-                elif self.config["arch"]["type"] == "BiDAFMultiParasOrigin":
-                    p1, p2 = self.model(data)
-                else:
-                    raise AssertionError("Unknown arch type!")
                 # use multi para
-                max_p_len = data.paras_word[0].shape[2]
-                s_idx = data.s_idx + data.answer_para_idx * max_p_len
-                e_idx = data.e_idx + data.answer_para_idx * max_p_len
+                max_p_len = input_data['paras_word'].shape[2]
+                s_idx = label['s_idx'] + label['answer_para_idx'] * max_p_len
+                e_idx = label['e_idx'] + label['answer_para_idx'] * max_p_len
 
                 # use single para
                 # s_idx = data.s_idx
@@ -163,10 +167,11 @@ class Trainer(BaseTrainer):
 
                 lamda = self.config["loss"]["lamda"]
                 # loss = self.loss(p1, s_idx) + self.loss(p2, e_idx)
-                if self.config["arch"]["type"] == "BiDAFMultiParas":
-                    loss = (1 - lamda) * (self.loss(p1, s_idx) + self.loss(p2, e_idx)) + lamda * self.loss(score, data.answer_para_idx)
-                else:
+                if self.config["arch"]["type"] == "BiDAFMultiParasOrigin":
                     loss = self.loss(p1, s_idx) + self.loss(p2, e_idx)
+                else:
+                    loss = (1 - lamda) * (self.loss(p1, s_idx) + self.loss(p2, e_idx)) + lamda * self.loss(score,
+                                                                                                           data.answer_para_idx)
                 # add scalar to writer
                 global_step = (epoch - 1) * len(self.data_loader.dev) + batch_idx
                 self.writer.add_scalar('eval_loss', loss.item(), global_step=global_step)
@@ -199,7 +204,7 @@ class Trainer(BaseTrainer):
                     # get all para idx
                     span_para_idxs.append(int(s_idx[i].item() // max_p_len))
                     gold_para_idxs.append(int(data.answer_para_idx[i].item()))
-                    if self.config["arch"]["type"] == "BiDAFMultiParas":
+                    if not self.config["arch"]["type"] == "BiDAFMultiParasOrigin":
                         pred_para_idxs.append(int(pred_para_idx_tensor[i].item()))
                     # for pred
                     pred["question_id"] = q_id
@@ -236,6 +241,21 @@ class Trainer(BaseTrainer):
         # metrics dict
         # metrics = np.array([val_loss])
         return results
+
+    def build_data(self, batch):
+        input_data = {
+            'q_word': batch.q_word[0],
+            'q_lens': batch.q_word[1],
+            'paras_word': batch.paras_word[0],
+            'paras_num': batch.paras_word[1],
+            'paras_lens': batch.paras_word[2],
+        }
+        label = {
+            's_idx': batch.s_idx,
+            'e_idx': batch.e_idx,
+            'answer_para_idx': batch.answer_para_idx
+        }
+        return input_data, label
 
     @staticmethod
     def get_acc(pred, gold):
