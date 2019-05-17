@@ -16,6 +16,7 @@ if __name__ == '__main__':
     path = sys.argv[1]
     save_path = sys.argv[2]
     num = int(sys.argv[3])
+
     num = int(num)
     print("begining combine the result...")
     combine_dataset = []

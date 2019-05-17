@@ -223,13 +223,6 @@ class BiDAFMultiParas(nn.Module):
         super(BiDAFMultiParas, self).__init__()
         self.args = args["arch"]["args"]
 
-        # 1. Character Embedding Layer
-        # self.char_emb = nn.Embedding(self.args["char_vocab_size"], self.args["char_dim"], padding_idx=1)
-        # nn.init.uniform_(self.char_emb.weight, -0.001, 0.001)
-        #
-        # self.char_conv = nn.Conv2d(1, self.args["char_channel_size"],
-        #                            (self.args["char_dim"], self.args["char_channel_width"]))
-
         # 2. Word Embedding Layer
         # self.word_emb = nn.Embedding.from_pretrained(pretrained, freeze=True)
         self.word_emb = PartiallyTrainEmbedding(pretrained, trainable_weight_idx)
@@ -294,25 +287,6 @@ class BiDAFMultiParas(nn.Module):
         self.dropout = nn.Dropout(p=self.args["dropout"])
 
     def forward(self, input_data, train=True):
-        # TODO: More memory-efficient architecture
-        def char_emb_layer(x):
-            """
-            :param x: (batch, seq_len, word_len)
-            :return: (batch, seq_len, char_channel_size)
-            """
-            batch_size = x.size(0)
-            # (batch, seq_len, word_len, char_dim)
-            x = self.dropout(self.char_emb(x))
-            # (batch * seq_len, 1, char_dim, word_len)
-            x = x.view(-1, self.args["char_dim"], x.size(2)).unsqueeze(1)
-            # (batch * seq_len, char_channel_size, 1, conv_len) -> (batch * seq_len, char_channel_size, conv_len)
-            x = self.char_conv(x).squeeze(2)
-            # (batch * seq_len, char_channel_size, 1) -> (batch * seq_len, char_channel_size)
-            x = F.max_pool1d(x, x.size(2)).squeeze()
-            # (batch, seq_len, char_channel_size)
-            x = x.view(batch_size, -1, self.args["char_channel_size"])
-
-            return x
 
         def highway_network(x):
             """
@@ -393,11 +367,7 @@ class BiDAFMultiParas(nn.Module):
             p2 = (self.p2_weight_g(g) + self.p2_weight_m(m2)).squeeze()
             return p1, p2
 
-        # 1. Character Embedding Layer
-        # p_char = char_emb_layer(batch.p_char)
-        # q_char = char_emb_layer(batch.q_char)
-
-        # read data
+        # 0.read data
         q_word, q_lens = input_data['q_word'], input_data['q_lens']  # (b, max_q_len), (b)
         # ----> (b, max_para_num, max_para_len), (b), (b, max_para_num)
         paras_word, paras_num, paras_lens = input_data['paras_word'], input_data['paras_num'], input_data['paras_lens']

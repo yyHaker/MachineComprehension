@@ -88,11 +88,16 @@ def preprocessd(path, save_path, train=True):
             # data["paragraph"] = choose_one_para(best_paras, sample["segmented_question"], recall)  # 当前使用单para
             data["paragraphs"] = best_paras  # multiple paras
             if train:
-                data["fake_answer"], data["s_idx"], data["e_idx"], data["match_score"], data["answer_para_idx"], data["answer_idx"] \
-                    = find_fake_answer_from_multi_paras(sample, data["paragraphs"])
+                # find one answer
+                # data["fake_answer"], data["s_idx"], data["e_idx"], data["match_score"], data["answer_para_idx"], data["answer_idx"] \
+                #     = find_fake_answer_from_multi_paras(data["paragraphs"], sample["segmented_answers"])
+                # find multiple answers
+                data["fake_answers"], data["s_idxs"], data["e_idxs"], data["match_scores"], data["answer_para_idxs"], data["answer_idx"] \
+                    = find_fake_answers_from_multi_paras(data["paragraphs"], sample["segmented_answers"])
             # for paragraphs post_process(just for torchText easy to use)
-            data["paragraphs"] = post_process_paras(best_paras, max_len=3)
-            if not train or data['match_score'] != 0:
+            # data["paragraphs"] = post_process_paras(best_paras, max_len=3)
+            data["paragraphs"] = post_process_paras_flags(best_paras, max_len=3)
+            if not train or check_scores(data["match_scores"]):
                 datas.append(data)
     # write to processed data file
     ensure_dir(os.path.split(save_path)[0])
@@ -106,10 +111,10 @@ def preprocessd(path, save_path, train=True):
 if __name__ == '__main__':
     path = sys.argv[1]
     save_path = sys.argv[2]
-    train = sys.argv[3]
-    if train == '0':
-        train = False
-    else:
-        train = True
-    print(train)
-    preprocessd(path, save_path, train=train)
+    # train = sys.argv[3]
+    # if train == '0':
+    #     train = False
+    # else:
+    #     train = True
+    # print("train: ", train)
+    preprocessd(path, save_path, train=True)

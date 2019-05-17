@@ -165,6 +165,19 @@ def repeat_tensor(tensor, dim=0, times=2):
     return torch.cat(res, dim=dim)
 
 
+def check_scores(scores):
+    """make sure not all scores are zero. (True)
+    :param scores:
+    :return:
+    """
+    tag = False
+    for score in scores:
+        if score != 0:
+            tag = True
+            break
+    return tag
+
+
 if __name__ == "__main__":
     text = "I like playing computer games."
     sent = "I want to watch tv in living room"

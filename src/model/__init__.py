@@ -9,3 +9,4 @@
 """
 from .bidaf import *
 from .spnet import *
+from .rnet import *

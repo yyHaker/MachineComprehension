@@ -11,11 +11,38 @@ from utils import *
 from .filter import IllegalWords
 
 
-def find_fake_answer_from_multi_paras(sample, paragraphs):
+def find_fake_answers_from_multi_paras(paragraphs, ref_answers):
+    """
+    find the best fake answers from multiple paras for every ref answer.
+    :param paragraphs:
+    :param ref_answers: ref answers list.
+    :return:
+    """
+    best_fake_answers = []
+    best_s_idxs = []
+    best_e_idxs = []
+    best_scores = []
+    best_para_idxs = []
+    best_ans_idxs = []
+    # for every ref answer to choose the best fake answer
+    for ref_ans in ref_answers:
+        best_fake_answer, best_s_idx, best_e_idx, best_score, best_para_idx, best_ans_idx \
+            = find_fake_answer_from_multi_paras(paragraphs, [ref_ans])
+        # get result
+        best_fake_answers.append(best_fake_answer)
+        best_s_idxs.append(best_s_idx)
+        best_e_idxs.append(best_e_idx)
+        best_scores.append(best_score)
+        best_para_idxs.append(best_para_idx)
+        best_ans_idxs.append(best_ans_idx)
+    return best_fake_answers, best_s_idxs, best_e_idxs, best_scores, best_para_idxs, best_ans_idxs
+
+
+def find_fake_answer_from_multi_paras(paragraphs, ref_answers):
     """
     find the best answer from multiple paras.
-    :param sample:
     :param paragraphs:
+    :param ref_answers: ref answers list.
     :return:
     """
     best_fake_answer = []
@@ -27,7 +54,7 @@ def find_fake_answer_from_multi_paras(sample, paragraphs):
     for para_idx, para in enumerate(paragraphs):
         if para[0] == '<eop>':
             continue
-        fake_answer, s_idx, e_idx, score, ans_idx = find_fake_answer_2(sample, para)
+        fake_answer, s_idx, e_idx, score, ans_idx = find_fake_answer_2(para, ref_answers)
         if score > best_score:
             best_score = score
             best_fake_answer = fake_answer
@@ -185,18 +212,20 @@ def find_search_paras(sample):
             docs.append(doc)
     docs = docs[:3]
     # 先全部拼接
-    for doc in docs:
+    for idx, doc in enumerate(docs):
         paras = doc["segmented_paragraphs"][:10]
+        concat_para += ["<doc_{}>".format(idx)] + ["<title>"]
         concat_para += doc["segmented_title"]
         concat_para += ['<sep>']
         for para in paras:
             concat_para += para + ['<sep>']
     # 看全部拼接后长度是否超过阈值
-    if len(concat_para) <= 500:
+    if len(concat_para) <= 502:
         preprocess_docs = []
-        for doc in docs:
+        for idx, doc in enumerate(docs):
             preprocess_para = []
             # 拼title
+            preprocess_para += ["<doc_{}>".format(idx)] + ["<title>"]
             preprocess_para += doc["segmented_title"] + ['<sep>']
             # 仅选取不为空的最多前10个段落
             paras = []
@@ -207,15 +236,16 @@ def find_search_paras(sample):
             # 拼接段落
             for para in paras:
                 preprocess_para += para + ['<sep>']
-            preprocess_para = preprocess_para[:500]
+            preprocess_para = preprocess_para[:502]
             preprocess_para += ['<eop>']
             preprocess_docs.append(preprocess_para)
     else:
         preprocess_docs = []
         question = sample['segmented_question']
-        for doc in docs:
+        for idx, doc in enumerate(docs):
             preprocess_para = []
             # 拼title
+            preprocess_para += ["<doc_{}>".format(idx)] + ["<title>"]
             preprocess_para += doc["segmented_title"] + ['<sep>']
             # 仅选取不为空的前10个段落
             paras = []
@@ -242,12 +272,12 @@ def find_search_paras(sample):
                 for i in sorted_idx:
                     if i != early_idx and i != early_next_idx:
                         preprocess_para += first_sentence(paras[i[0]]) + ['<sep>']
-                preprocess_para = preprocess_para[:500]
+                preprocess_para = preprocess_para[:502]
                 preprocess_para += ['<eop>']
                 preprocess_docs.append(preprocess_para)
     # 对para数量不足3的，直接加入<eop>
-    for i in range(3 - len(preprocess_docs)):
-        preprocess_docs.append(['<eop>'])
+    # for i in range(3 - len(preprocess_docs)):
+    #     preprocess_docs.append(['<eop>'])
     return preprocess_docs
 
 
@@ -257,6 +287,9 @@ def find_zhidao_paras(sample, train=True):
     :return:
       multiple paras,
        'best_paras:'  []
+    ------
+    every paragraph is composed:
+    ['<doc_0>', '<title>', title, <sep>, para_0, <sep>, para_1, <sep>, para_2]
     """
     # 计算最佳的paras
     best_paras = []
@@ -271,7 +304,7 @@ def find_zhidao_paras(sample, train=True):
             if len(doc["segmented_paragraphs"]) != 0:
                 docs.append(doc)
     docs = docs[: 3]
-    for doc in docs:
+    for idx, doc in enumerate(docs):
         c_para = []
         title = doc["segmented_title"]
         # 取前面4个不为空的para
@@ -281,13 +314,13 @@ def find_zhidao_paras(sample, train=True):
                 paras.append(para)
         # 只要没超过最大长度，就一直加，直到所有para加完为止
         # 将每个doc的tile+4paras拼接
-        c_para = c_para + title
+        c_para = c_para + ["<doc_{}>".format(idx)] + ["<title>"] + title
         for para in paras:
             c_para = c_para + ["<sep>"] + para
-            if len(c_para) > 500:
+            if len(c_para) > 502:
                 break
-        # 截取一定的长度(默认500)
-        c_para = c_para[: 500] if len(c_para) > 500 else c_para
+        # 截取一定的长度(默认502)
+        c_para = c_para[: 502] if len(c_para) > 502 else c_para
         best_paras.append(c_para)
     return best_paras
 
@@ -326,12 +359,12 @@ def choose_one_para(paras, question, metric_fn):
             return best_para
 
 
-def find_fake_answer_2(sample, paragraph):
-    """find paragraph and fake answer for one sample. (not skip paras)
+def find_fake_answer_2(paragraph, ref_answers):
+    """find paragraph and fake answer from one paragraph(combined by paras). (not skip paras)
     --------
     答案只会在某个para中，不会跨para.
-    :param sample:
     :param paragraph: the choosed para. (title + 4paras)
+    :param ref_answers: ref answers list
     :return:
     """
     best_para = paragraph
@@ -340,7 +373,7 @@ def find_fake_answer_2(sample, paragraph):
     paras = paras_list[1:]  # answer not in title
     # get answer tokens
     answer_tokens = set()
-    for segmented_answer in sample["segmented_answers"]:
+    for segmented_answer in ref_answers:
         answer_tokens = answer_tokens | set([token for token in segmented_answer])
     # choose answer span
     best_start_idx = len(title) + 1
@@ -349,7 +382,7 @@ def find_fake_answer_2(sample, paragraph):
     best_ans_idx = -1
     relative_pos = len(title) + 1
     for para in paras:
-        res = _find_answer_span_from_one_para(para, answer_tokens, sample["segmented_answers"])
+        res = _find_answer_span_from_one_para(para, answer_tokens, ref_answers)
         if res:
             # just calc index and update best score
             s_idx, e_idx, score, ans_idx = res
