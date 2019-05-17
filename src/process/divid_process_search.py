@@ -58,7 +58,10 @@ def preprocessd_multi_para(path, save_path, train=True):
             if (idx + 1) % 1000 == 0:
                 print("processed: {}".format(idx + 1))
                 print("data len: {}".format(len(datas)))
+            if len(datas) == 10:
+                break
     # write to processed data file
+    ensure_dir(os.path.split(save_path)[0])
     print("processed done! write to file!")
     with codecs.open(save_path, "w", encoding="utf-8") as f_out:
         for line in datas:
@@ -70,10 +73,10 @@ def preprocessd_multi_para(path, save_path, train=True):
 if __name__ == '__main__':
     path = sys.argv[1]
     save_path = sys.argv[2]
-    # train = sys.argv[3]
-    # if train == '0':
-    #     train = False
-    # else:
-    #     train = True
-    # print(train)
-    preprocessd_multi_para(path, save_path, train=True)
+    train = sys.argv[3]
+    if train == '0':
+        train = False
+    else:
+        train = True
+    print("if train: ", train)
+    preprocessd_multi_para(path, save_path, train=train)

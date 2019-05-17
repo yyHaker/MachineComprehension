@@ -14,12 +14,14 @@ from .base_trainer import BaseTrainer
 import json
 import codecs
 import os
+from copy import deepcopy
 
-from utils import squad_evaluate, ensure_dir
+from utils import *
 from du_evaluation_metric import calc_score
 
 import torch.nn.functional as F
 import torch
+
 
 class Trainer(BaseTrainer):
     """
@@ -81,26 +83,69 @@ class Trainer(BaseTrainer):
                 p1, p2, score = self.model(input_data)
             # p1, p2 = self.model(data)
             self.optimizer.zero_grad()
-            # 计算s_idx, e_idx在多个para连接时的绝对值
-            max_p_len = input_data['paras_word'].shape[2]
-            s_idx = label['s_idx'] + label['answer_para_idx'] * max_p_len
-            e_idx = label['e_idx'] + label['answer_para_idx'] * max_p_len
 
             # use single para
             # s_idx = data.s_idx
             # e_idx = data.e_idx
 
-            # calc loss
+            # 计算s_idx, e_idx在多个para连接时的绝对值 (for one answer)
+            max_p_len = input_data['paras_word'].shape[2]
+            s_idx = label['s_idx'] + label['answer_para_idx'] * max_p_len
+            e_idx = label['e_idx'] + label['answer_para_idx'] * max_p_len
+            # calc loss()
             lamda = self.config["loss"]["lamda"]
             if self.config["arch"]["type"] == "BiDAFMultiParasOrigin":
                 loss = self.loss(p1, s_idx) + self.loss(p2, e_idx)
             else:
                 loss = (1 - lamda) * (self.loss(p1, s_idx) + self.loss(p2, e_idx)) + lamda * self.loss(score,
                                                                                                        data.answer_para_idx)
+
+            # 计算s_idx, e_idx在多个para连接时的绝对值 (for multiple answer)
+            # max_p_len = input_data['paras_word'].shape[2]
+            # ans_num = label['s_idxs'].shape[1]
+            # batch_size = label['s_idxs'].shape[0]
+            # # for every answer to calc weighted loss
+            # match_scores = F.softmax(torch.Tensor(pad_list(label['match_scores'], pad=INF)).to(self.device), dim=-1)
+            # ans_loss = torch.zeros(label['s_idxs'].shape[0]).to(self.device)
+            # idx = 0
+            # s_idx = label['s_idxs'][:, idx] + label['answer_para_idxs'][:, idx] * max_p_len
+            # e_idx = label['e_idxs'][:, idx] + label['answer_para_idxs'][:, idx] * max_p_len
+            #
+            # target1 = torch.empty(batch_size, dtype=torch.long).random_(5).to(self.device)
+            # target2 = torch.empty(batch_size, dtype=torch.long).random_(5).to(self.device)
+            # ans_loss = (self.loss(p1, target1) + self.loss(p2, target2))  # [b]
+            # # calc loss
+            # lamda = self.config["loss"]["lamda"]
+            # if self.config["arch"]["type"] == "BiDAFMultiParasOrigin":
+            #     loss = torch.mean(ans_loss)
+            # else:
+            #     # pr_loss = torch.zeros(label['s_idxs'].shape[0]).to(self.device)
+            #     loss = ans_loss
+            #     # for j in range(ans_num):
+            #     #     pr_loss += self.loss(score, label['answer_para_idxs'][:, j]) * match_scores[:, j]
+            #     # loss = (1 - lamda) * torch.mean(ans_loss) + lamda * torch.mean(pr_loss)
+
+            # 计算s_idx, e_idx在多个para连接时的绝对值 (for multiple answer)
+            # max_p_len = input_data['paras_word'].shape[2]
+            # ans_num = label['s_idxs'].shape[1]
+            # batch_size = label['s_idxs'].shape[0]
+            # # for every answer to calc weighted loss
+            # match_scores = F.softmax(torch.Tensor(pad_list(label['match_scores'], pad=INF)).to(self.device), dim=-1).reshape(-1)
+            # s_idxs = label['s_idxs'].reshape(-1) + label["answer_para_idxs"].reshape(-1) * max_p_len
+            # e_idxs = label['e_idxs'].reshape(-1) + label["answer_para_idxs"].reshape(-1) * max_p_len  # (b*ans_num)
+            # p1s = p1.unsqueeze(1).expand(-1, ans_num, -1).reshape(batch_size*ans_num, -1)  # (b*ans_num, max_p_len)
+            # p2s = p2.unsqueeze(1).expand(-1, ans_num, -1).reshape(batch_size*ans_num, -1)  # (b*ans_num, max_p_len)
+            #
+            # loss = torch.mean((self.loss(p1s, s_idxs) + self.loss(p2s, e_idxs)) * match_scores)
+
+            # calc loss
+            # lamda = self.config["loss"]["lamda"]
+            # # loss = (1 - lamda) * torch.mean(torch.stack(ans_losses, dim=0).sum(dim=0))
+            # # lamda * torch.mean(torch.stack(pr_losses, dim=0).sum(dim=0))
             loss.backward()
             self.optimizer.step()
 
-            total_loss += loss.item() * p1.size()[0]
+            total_loss = total_loss + loss.item() * p1.size()[0]
             if batch_idx % self.log_step == 0:
                 self.logger.info('Train Epoch: {} [{}/{} ({:.0f}%)] Loss: {:.6f}'.format(
                     epoch,
@@ -157,21 +202,42 @@ class Trainer(BaseTrainer):
                     # get pred ans para idx
                     pred_para_idx_tensor = torch.argmax(F.softmax(score, dim=1), dim=1)
                 # use multi para
-                max_p_len = input_data['paras_word'].shape[2]
-                s_idx = label['s_idx'] + label['answer_para_idx'] * max_p_len
-                e_idx = label['e_idx'] + label['answer_para_idx'] * max_p_len
+                # max_p_len = input_data['paras_word'].shape[2]
+                # s_idx = label['s_idx'] + label['answer_para_idx'] * max_p_len
+                # e_idx = label['e_idx'] + label['answer_para_idx'] * max_p_len
 
                 # use single para
                 # s_idx = data.s_idx
                 # e_idx = data.e_idx
 
+                # lamda = self.config["loss"]["lamda"]
+                # # loss = self.loss(p1, s_idx) + self.loss(p2, e_idx)
+                # if self.config["arch"]["type"] == "BiDAFMultiParasOrigin":
+                #     loss = self.loss(p1, s_idx) + self.loss(p2, e_idx)
+                # else:
+                #     loss = (1 - lamda) * (self.loss(p1, s_idx) + self.loss(p2, e_idx)) + lamda * self.loss(score,
+                #                                                                                            data.answer_para_idx)
+
+                # 计算s_idx, e_idx在多个para连接时的绝对值 (for multiple answer)
+                max_p_len = input_data['paras_word'].shape[2]
+                ans_num = label['s_idxs'].shape[1]
+                # for every answer to calc weighted loss
+                match_scores = F.softmax(torch.Tensor(pad_list(label['match_scores'], pad=INF)), dim=-1)
+                ans_loss = torch.zeros(label['s_idxs'].shape[0]).to(self.device)
+                for idx in range(ans_num):
+                    s_idx = label['s_idxs'][:, idx] + label['answer_para_idxs'][:, idx] * max_p_len
+                    e_idx = label['e_idxs'][:, idx] + label['answer_para_idxs'][:, idx] * max_p_len
+                    ans_loss += (self.loss(p1, s_idx) + self.loss(p2, e_idx)) * match_scores[:, idx]  # [b]
+                # calc loss
                 lamda = self.config["loss"]["lamda"]
-                # loss = self.loss(p1, s_idx) + self.loss(p2, e_idx)
                 if self.config["arch"]["type"] == "BiDAFMultiParasOrigin":
-                    loss = self.loss(p1, s_idx) + self.loss(p2, e_idx)
+                    loss = torch.mean(ans_loss)
                 else:
-                    loss = (1 - lamda) * (self.loss(p1, s_idx) + self.loss(p2, e_idx)) + lamda * self.loss(score,
-                                                                                                           data.answer_para_idx)
+                    pr_loss = torch.zeros(label['s_idxs'].shape[0]).to(self.device)
+                    for j in range(ans_num):
+                        pr_loss += self.loss(score, label['answer_para_idxs'][:, j]) * match_scores[:, j]
+                    loss = (1 - lamda) * torch.mean(ans_loss) + lamda * torch.mean(pr_loss)
+
                 # add scalar to writer
                 global_step = (epoch - 1) * len(self.data_loader.dev) + batch_idx
                 self.writer.add_scalar('eval_loss', loss.item(), global_step=global_step)
@@ -251,9 +317,10 @@ class Trainer(BaseTrainer):
             'paras_lens': batch.paras_word[2],
         }
         label = {
-            's_idx': batch.s_idx,
-            'e_idx': batch.e_idx,
-            'answer_para_idx': batch.answer_para_idx
+            's_idxs': batch.s_idxs,
+            'e_idxs': batch.e_idxs,
+            'answer_para_idxs': batch.answer_para_idxs,
+            'match_scores': batch.match_scores
         }
         return input_data, label
 

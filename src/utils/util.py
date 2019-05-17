@@ -21,6 +21,8 @@ import torch
 # def tokenizer(text):
 #     return [tok.text for tok in spacy_en.tokenizer(text.strip())]
 
+INF = 1e30  # 定义正无穷
+
 
 def CN_tokenizer(text):
     return list(jieba.cut(text))
@@ -95,6 +97,22 @@ def split_list(alist, word):
         elif i == len(alist) - 1 and relative_pos != len(alist) - 1:
             res.append(alist[relative_pos:])
             break
+    return res
+
+
+def pad_list(A, pad=0):
+    """
+    pad list to max_len.
+    :param A: shape size is 2.
+    :param pad:
+    :return:
+    """
+    max_len = max([len(a) for a in A])
+    res = []
+    for a in A:
+        if len(a) < max_len:
+            a = a + [pad] * (max_len-len(a))
+        res.append(a)
     return res
 
 
@@ -179,19 +197,27 @@ def check_scores(scores):
 
 
 if __name__ == "__main__":
-    text = "I like playing computer games."
-    sent = "I want to watch tv in living room"
-    text2 = "网站赌博输钱报警有吗"
-    print(CN_tokenizer(text2))
-    # print(tokenizer(sent))
+    # text = "I like playing computer games."
+    # sent = "I want to watch tv in living room"
+    # text2 = "网站赌博输钱报警有吗"
+    # print(CN_tokenizer(text2))
+    # # print(tokenizer(sent))
+    #
+    # a = ["a", "<sep>", "b", "c", "<sep>", "hjlo", "Hi", "<sep>"]
+    # res = split_list(a, "<sep>")
+    #
+    # a = torch.rand(3, 5, 7)
+    # print("a: ")
+    # print(a)
+    # res = repeat_tensor(a, 0, 3)
+    # print("res: ")
+    # print(res)
 
-    a = ["a", "<sep>", "b", "c", "<sep>", "hjlo", "Hi", "<sep>"]
-    res = split_list(a, "<sep>")
+    A = [
+        [1, 2],
+        [3, 5, 6],
+        [3, 2, 5, 6]
+    ]
+    print(pad_list(A))
 
-    a = torch.rand(3, 5, 7)
-    print("a: ")
-    print(a)
-    res = repeat_tensor(a, 0, 3)
-    print("res: ")
-    print(res)
 

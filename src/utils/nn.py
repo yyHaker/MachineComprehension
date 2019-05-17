@@ -43,7 +43,7 @@ class LSTM(nn.Module):
     def forward(self, x):
         self.rnn.flatten_parameters()
         x, x_len = x
-        x = x.size()[1]
+        total_length = x.size()[1]
         x = self.dropout(x)
 
         x_len_sorted, x_idx = torch.sort(x_len, descending=True)

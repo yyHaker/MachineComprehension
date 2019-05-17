@@ -361,7 +361,7 @@ class BiDAFMultiParas(nn.Module):
             # p1: (batch, para_num*p_len)
             p1 = (self.p1_weight_g(g) + self.p1_weight_m(m)).squeeze()
             # m2: (batch, para_num*p_len, hidden_size * 2)
-            m2 = self.output_LSTM((m, l), total_length=m.shape[1])[0]
+            m2 = self.output_LSTM((m, l))[0]
             # print('In Pointer:', p1.shape, m2.shape)
             # p2: (batch, para_num*p_len)
             p2 = (self.p2_weight_g(g) + self.p2_weight_m(m2)).squeeze()
@@ -400,8 +400,8 @@ class BiDAFMultiParas(nn.Module):
         q = highway_network(q_word)
 
         # 3. Contextual Embedding Layer
-        p = self.context_LSTM((p, paras_lens_reshape), total_length=p.shape[1])[0]  # (b*max_para_num, max_para__len, d)
-        q = self.context_LSTM((q, q_lens), total_length=q.shape[1])[0]  # (b, max_q_len, d)
+        p = self.context_LSTM((p, paras_lens_reshape))[0]  # (b*max_para_num, max_para__len, d)
+        q = self.context_LSTM((q, q_lens))[0]  # (b, max_q_len, d)
 
         # duplicate q: (b, max_q_len, d) -> (b, max_para_num, max_q_len, d)   -> (b*max_para_num, max_q_len, d)
         # mask q
@@ -418,8 +418,8 @@ class BiDAFMultiParas(nn.Module):
         # 5. Modeling Layer
         # ---> (b*max_para_num, max_p_len, d)
         m = self.modeling_LSTM2(
-            (self.modeling_LSTM1((g, paras_lens_reshape), total_length=g.shape[1])[0],
-             paras_lens_reshape), total_length=g.shape[1])[0]
+            (self.modeling_LSTM1((g, paras_lens_reshape))[0],
+             paras_lens_reshape))[0]
         # self.logger.info(f'm:{m.shape}')
 
         # 6. Output Layer

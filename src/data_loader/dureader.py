@@ -1,7 +1,7 @@
 #!/usr/bin/python
 # coding:utf-8
 
-"""
+"""从dureader 2019.2.0的官方预处理数据的基础上采用启发式预处理的方式处理数据，加载数据
 @author: yyhaker
 @contact: 572176750@qq.com
 @file: dureader.py

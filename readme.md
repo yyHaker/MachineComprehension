@@ -8,7 +8,6 @@
 - GPU: Nvidia Titan Xp
 - Language: Python 3.6.2.
 - Pytorch: **0.4.1**
-- torch==0.4.0
 - nltk==3.2.4
 - tensorboardX==0.8
 - torchtext==0.3.1

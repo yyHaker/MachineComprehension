@@ -99,6 +99,8 @@ def preprocessd(path, save_path, train=True):
             data["paragraphs"] = post_process_paras_flags(best_paras, max_len=3)
             if not train or check_scores(data["match_scores"]):
                 datas.append(data)
+            if len(datas) == 10:
+                break
     # write to processed data file
     ensure_dir(os.path.split(save_path)[0])
     print("processed done! write to file!")
@@ -111,10 +113,10 @@ def preprocessd(path, save_path, train=True):
 if __name__ == '__main__':
     path = sys.argv[1]
     save_path = sys.argv[2]
-    # train = sys.argv[3]
-    # if train == '0':
-    #     train = False
-    # else:
-    #     train = True
-    # print("train: ", train)
-    preprocessd(path, save_path, train=True)
+    train = sys.argv[3]
+    if train == '0':
+        train = False
+    else:
+        train = True
+    print("if train: ", train)
+    preprocessd(path, save_path, train=train)
