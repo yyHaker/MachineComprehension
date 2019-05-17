@@ -115,6 +115,23 @@ def seq_mask(seq_len, device, max_len=None):
     return mask
 
 
+def softmax_mask(A, mask, dim=1, epsilon=1e-12):
+    '''
+        applay oftmax on A and consider mask
+        :param A:
+        :param mask:
+        :param dim:
+        :param epsilon:
+        :return:
+        '''
+    # According to https://discuss.pytorch.org/t/apply-mask-softmax/14212/7
+    A_max = torch.max(A, dim=dim, keepdim=True)[0]
+    A_exp = torch.exp(A - A_max)
+    A_exp = A_exp * mask  # this step masks
+    A_softmax = A_exp / (torch.sum(A_exp, dim=dim, keepdim=True) + epsilon)
+    return A_softmax
+
+
 def log_softmax_mask(A, mask, dim=1, epsilon=1e-12):
     '''
     applay log_softmax on A and consider mask
@@ -125,11 +142,7 @@ def log_softmax_mask(A, mask, dim=1, epsilon=1e-12):
     :return:
     '''
     # According to https://discuss.pytorch.org/t/apply-mask-softmax/14212/7
-    A_max = torch.max(A, dim=dim, keepdim=True)[0]
-    A_exp = torch.exp(A - A_max)
-    A_exp = A_exp * mask  # this step masks
-    A_log_softmax = torch.log(A_exp / (torch.sum(A_exp, dim=dim, keepdim=True) + epsilon))
-    return A_log_softmax
+    return torch.log(softmax_mask(A, mask, dim=1, epsilon=epsilon))
 
 
 def repeat_tensor(tensor, dim=0, times=2):

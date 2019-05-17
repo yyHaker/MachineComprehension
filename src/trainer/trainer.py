@@ -233,7 +233,7 @@ class Trainer(BaseTrainer):
 
         # calc para acc
         span_acc = self.get_acc(span_para_idxs, gold_para_idxs)
-        if self.config["arch"]["type"] == "BiDAFMultiParas":
+        if not self.config["arch"]["type"] == "BiDAFMultiParasOrigin":
             # self.logger.info(pred_para_idxs[:100])
             # self.logger.info(gold_para_idxs[:100])
             # self.logger.info(span_para_idxs[:100])
