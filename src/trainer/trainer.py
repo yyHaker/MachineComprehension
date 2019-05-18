@@ -83,6 +83,7 @@ class Trainer(BaseTrainer):
             max_ans_num = data.s_idxs.shape[1]
             max_p_len = input_data['paras_word'].shape[2]
             max_p_num = input_data['paras_word'].shape[1]
+
             match_scores = F.softmax(torch.Tensor(pad_list(label['match_scores'], pad=-1e12)).to(self.device), dim=1)
 
             reshape_s_idxs = data.s_idxs.reshape(-1)
@@ -123,10 +124,17 @@ class Trainer(BaseTrainer):
             # print(reshape_s_idxs >= max_p_len*max_p_num)
             # print(reshape_e_idxs >= max_p_len * max_p_num)
 
+            ### 加match socre
             lamda = self.config["loss"]["lamda"]
             ans_span_loss = (self.loss(dup_p1, reshape_s_idxs) + self.loss(dup_p2, reshape_e_idxs)) * reshape_match_scores
             pr_loss = self.loss(dup_score, reshape_answer_para_idxs) * reshape_match_scores
             all_loss = torch.mean((1 - lamda) * ans_span_loss + lamda * pr_loss)
+
+            # 不加match score
+            # lamda = self.config["loss"]["lamda"]
+            # ans_span_loss = (self.loss(dup_p1, reshape_s_idxs) + self.loss(dup_p2, reshape_e_idxs))
+            # pr_loss = self.loss(dup_score, reshape_answer_para_idxs)
+            # all_loss = torch.mean((1 - lamda) * ans_span_loss + lamda * pr_loss)
 
             all_loss.backward()
             self.optimizer.step()
