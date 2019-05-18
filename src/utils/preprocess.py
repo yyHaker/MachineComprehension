@@ -28,13 +28,15 @@ def find_fake_answers_from_multi_paras(paragraphs, ref_answers):
     for ref_ans in ref_answers:
         best_fake_answer, best_s_idx, best_e_idx, best_score, best_para_idx, best_ans_idx \
             = find_fake_answer_from_multi_paras(paragraphs, [ref_ans])
-        # get result
-        best_fake_answers.append(best_fake_answer)
-        best_s_idxs.append(best_s_idx)
-        best_e_idxs.append(best_e_idx)
-        best_scores.append(best_score)
-        best_para_idxs.append(best_para_idx)
-        best_ans_idxs.append(best_ans_idx)
+        # filter s_idx=-1 or e_idx = -1
+        if best_s_idx != -1 and best_e_idx != -1 and best_score != 0:
+            # get result
+            best_fake_answers.append(best_fake_answer)
+            best_s_idxs.append(best_s_idx)
+            best_e_idxs.append(best_e_idx)
+            best_scores.append(best_score)
+            best_para_idxs.append(best_para_idx)
+            best_ans_idxs.append(best_ans_idx)
     return best_fake_answers, best_s_idxs, best_e_idxs, best_scores, best_para_idxs, best_ans_idxs
 
 

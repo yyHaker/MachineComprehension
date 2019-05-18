@@ -12,12 +12,25 @@ import os
 import sys
 
 
+def check_file(path, num):
+    """
+    :param path:
+    :param num:
+    :return:
+    """
+    for i in range(num):
+        if not os.path.exists(path+str(i)):
+            print("file {} not exist ".format(i))
+
+
 if __name__ == '__main__':
     path = sys.argv[1]
     save_path = sys.argv[2]
     num = int(sys.argv[3])
-
     num = int(num)
+    # check file
+    print("check file...")
+    check_file(path, num)
     print("begining combine the result...")
     combine_dataset = []
     for i in range(num):

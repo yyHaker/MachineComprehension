@@ -146,7 +146,7 @@ class PartiallyTrainEmbedding(nn.Module):
         self.register_buffer('weight', weight)
 
     def forward(self, inp):
-        self.weight.detach()
+        self.weight.detach_()
         self.weight[self.trainable_weight_idx] = self.trainable_weight
         return torch.nn.functional.embedding(
             inp, self.weight, None, None, 2.0, False, False)
