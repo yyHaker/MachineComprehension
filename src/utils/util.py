@@ -178,6 +178,22 @@ def repeat_tensor(tensor, dim=0, times=2):
     return torch.cat(res, dim=dim)
 
 
+def pad_list(A, pad=0):
+    """
+    pad list to max_len.
+    :param A: shape size is 2.
+    :param pad:
+    :return:
+    """
+    max_len = max([len(a) for a in A])
+    res = []
+    for a in A:
+        if len(a) < max_len:
+            a = a + [pad] * (max_len-len(a))
+        res.append(a)
+    return res
+
+
 if __name__ == "__main__":
     text = "I like playing computer games."
     sent = "I want to watch tv in living room"

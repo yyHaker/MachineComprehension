@@ -11,7 +11,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from utils.nn import Linear, LSTM, PartiallyTrainEmbedding, PartiallyTrainEmbedding2
+from utils.nn import Linear, LSTM, PartiallyTrainEmbedding
 from utils.util import softmax_mask, seq_mask
 
 import logging

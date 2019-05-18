@@ -14,7 +14,7 @@ import os
 import logging
 
 import torch
-import data_loader.dureader as module_data
+import data_loader.dureader_plus as module_data
 import model as module_arch
 import loss.loss as module_loss
 import metric.metric as module_metric
@@ -24,6 +24,21 @@ import random
 import numpy as np
 from utils import ensure_dir
 import codecs
+
+
+def get_spacial_words(vocab):
+    idxs = []
+    words = ['<doc_0>', '<doc_1>', '<doc_2>', '<doc_3>', '<doc_4>',
+             '<para_0>', '<para_1>', '<para_2>', '<para_3>', '<para_4>', '<para_5>', '<para_6>', '<para_7>', '<para_8>', '<para_9>',
+             '<title>', '<empty>']
+    for word in words:
+        idx = vocab.stoi[word]
+        # all unk word in vocab idx are
+        if idx != vocab.stoi['<this_is_a_unk_word>']:
+            idxs.append(idx)
+        else:
+            logger.info(f'unk functional:{word}')
+    return idxs
 
 
 def main(config, resume):
@@ -36,11 +51,11 @@ def main(config, resume):
 
     # add config run params
     # config['arch']['args']['char_vocab_size'] = len(data_loader.CHAR.vocab)
-    config['arch']['args']['word_vocab_size'] = len(data_loader.WORD.vocab)
-    sep_idx, eop_idx = data_loader.vocab.stoi['<sep>'], data_loader.vocab.stoi['<eop>']
-    logger.info(f'idx:{sep_idx},{eop_idx}')
+    config['arch']['args']['word_vocab_size'] = len(data_loader.vocab)
+    spacial_words = get_spacial_words(data_loader.vocab)
+    logger.info(f'idx:{spacial_words}')
     # build model architecture
-    model = getattr(module_arch, config['arch']['type'])(config, data_loader.vocab_vectors, torch.tensor([sep_idx, eop_idx]))
+    model = getattr(module_arch, config['arch']['type'])(config, data_loader.vocab_vectors, torch.tensor(spacial_words))
 
     # get function handles of loss
     loss = getattr(module_loss, config['loss']['type'])
