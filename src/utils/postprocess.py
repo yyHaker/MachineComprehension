@@ -71,6 +71,40 @@ def post_process_paras_flags(paragraphs, max_len=3):
     return new_paras
 
 
+def reverse_post_process_paras_flags(paragraphs, max_len=3):
+    """
+        add special token to every paragraph.
+        :param paragraphs: composed of paragraph, paragraph contain several little paras.
+        :param max_len: the max num of paragraph.
+        :return:
+        -------
+        example:
+        # 每个paragraph第一个<sep>前面的是title.
+        >>> a = [
+            [title, '<sep>', p0, '<sep>', p1, '<sep>', p2, '<eop>'],
+            [title, '<sep>', p0, '<eop>'],
+            ['<eop>']
+        ]
+        >>> reverse_post_process_paras_flags(a, max_len=3)
+        [
+            [title,'<para_0>', p0,'<para_1>', p1, '<para_2>', p2, '<eop>'],
+            [title, '<para_0>', p0, '<eop>'],
+            ['empty']
+        ]
+        """
+    new_paras = []
+    for idx, paragraph in enumerate(paragraphs):
+        if len(paragraph) > 1:
+            paragraph = _change_sep(paragraph)
+        elif len(paragraph) == 1:
+            paragraph = ["<empty>"]
+        else:
+            raise Exception("not supported paragraphs len!")
+        new_paras.append(paragraph)
+    assert len(new_paras) == max_len
+    return new_paras
+
+
 def _change_sep(paragraph):
     """
     change the flag <sep> in paragraph to <para_idx>.

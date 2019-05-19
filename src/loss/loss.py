@@ -17,6 +17,17 @@ def cross_entropy(output, target):
     :param target:
     :return:
     """
+    loss = torch.nn.CrossEntropyLoss()
+    return loss(output, target)
+
+
+def cross_entropy_batch(output, target):
+    """
+    cross entropy loss.
+    :param output:
+    :param target:
+    :return:
+    """
     loss = torch.nn.CrossEntropyLoss(reduction='none')
     return loss(output, target)
 

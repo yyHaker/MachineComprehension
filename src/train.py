@@ -30,7 +30,7 @@ def get_spacial_words(vocab):
     idxs = []
     words = ['<doc_0>', '<doc_1>', '<doc_2>', '<doc_3>', '<doc_4>',
              '<para_0>', '<para_1>', '<para_2>', '<para_3>', '<para_4>', '<para_5>', '<para_6>', '<para_7>', '<para_8>', '<para_9>',
-             '<title>', '<empty>']
+             '<title>', '<empty>', '<eop>']
     for word in words:
         idx = vocab.stoi[word]
         # all unk word in vocab idx are

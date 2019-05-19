@@ -216,7 +216,7 @@ class BiDAF(nn.Module):
         return p1, p2
 
 
-class BiDAFMultiParas(nn.Modulepwd):
+class BiDAFMultiParas(nn.Module):
     """BiDAF on multi paragraphs"""
 
     def __init__(self, args, pretrained, trainable_weight_idx):
@@ -1180,7 +1180,7 @@ class BiDAFMultiParasOrigin(nn.Module):
             # p1: (batch, para_num*p_len)
             p1 = (self.p1_weight_g(g) + self.p1_weight_m(m)).squeeze()
             # m2: (batch, para_num*p_len, hidden_size * 2)
-            m2 = self.output_LSTM((m, l), total_length=m.shape[1])[0]
+            m2 = self.output_LSTM((m, l))[0]
             # print('In Pointer:', p1.shape, m2.shape)
             # p2: (batch, para_num*p_len)
             p2 = (self.p2_weight_g(g) + self.p2_weight_m(m2)).squeeze()
