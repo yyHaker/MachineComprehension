@@ -28,7 +28,7 @@ import codecs
 
 def get_spacial_words(vocab):
     idxs = []
-    words = ['<doc_0>', '<doc_1>', '<doc_2>','<doc_3>','<doc_4>',
+    words = ['<doc_0>', '<doc_1>', '<doc_2>', '<doc_3>', '<doc_4>',
              '<para_0>', '<para_1>', '<para_2>', '<para_3>', '<para_4>', '<para_5>', '<para_6>', '<para_7>', '<para_8>', '<para_9>',
              '<title>', '<empty>']
     for word in words:
@@ -47,20 +47,15 @@ def main(config, resume):
     data_loader = getattr(module_data, config['data_loader']['type'])(config)
 
     # for idx, data in enumerate(data_loader.eval_iter):
-    #     #     # print("idx: ", idx, " ", data)
-    #     #     # print(data.s_idxs)
+    #     print("idx: ", idx, " ", data)
 
     # add config run params
     # config['arch']['args']['char_vocab_size'] = len(data_loader.CHAR.vocab)
-    # config['arch']['args']['word_vocab_size'] = len(data_loader.WORD.vocab)
-    # sep_idx, eop_idx = data_loader.vocab.stoi['<sep>'], data_loader.vocab.stoi['<eop>']
-    # logger.info(f'idx:{sep_idx},{eop_idx}')
-
-    # for multi tags
-    special_words = get_spacial_words(data_loader.vocab)
-
+    config['arch']['args']['word_vocab_size'] = len(data_loader.vocab)
+    spacial_words = get_spacial_words(data_loader.vocab)
+    logger.info(f'idx:{spacial_words}')
     # build model architecture
-    model = getattr(module_arch, config['arch']['type'])(config, data_loader.vocab_vectors, torch.tensor(special_words))
+    model = getattr(module_arch, config['arch']['type'])(config, data_loader.vocab_vectors, torch.tensor(spacial_words))
 
     # get function handles of loss
     loss = getattr(module_loss, config['loss']['type'])
@@ -83,7 +78,7 @@ def main(config, resume):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='PyTorch MC')
-    parser.add_argument('-c', '--config', default="du_config_toy_zhidao.json", type=str,
+    parser.add_argument('-c', '--config', default="", type=str,
                         help='config file path (default: None)')
     parser.add_argument('-r', '--resume', default=None, type=str,
                         help='path to latest checkpoint (default: None)')

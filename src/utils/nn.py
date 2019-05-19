@@ -116,16 +116,18 @@ class GRU(nn.Module):
 
 class Linear(nn.Module):
     """Linear"""
-    def __init__(self, in_features, out_features, dropout=0.0):
+    def __init__(self, in_features, out_features, bias=True, dropout=0.0):
         super(Linear, self).__init__()
-        self.linear = nn.Linear(in_features=in_features, out_features=out_features)
+        self.bias = bias
+        self.linear = nn.Linear(in_features=in_features, out_features=out_features, bias=self.bias)
         if dropout > 0:
             self.dropout = nn.Dropout(p=dropout)
         self.reset_params()
 
     def reset_params(self):
         nn.init.kaiming_normal_(self.linear.weight)
-        nn.init.constant_(self.linear.bias, 0)
+        if self.bias:
+            nn.init.constant_(self.linear.bias, 0)
 
     def forward(self, x):
         if hasattr(self, 'dropout'):
@@ -148,5 +150,28 @@ class PartiallyTrainEmbedding(nn.Module):
     def forward(self, inp):
         self.weight.detach_()
         self.weight[self.trainable_weight_idx] = self.trainable_weight
+        return torch.nn.functional.embedding(
+            inp, self.weight, None, None, 2.0, False, False)
+
+
+class PartiallyTrainEmbedding2(torch.nn.Module):
+    def __init__(self, weight, trainable_weight_idx):
+        super().__init__()
+        self.num_to_learn = trainable_weight_idx.shape[0]
+        self.trainable_weight_idx = trainable_weight_idx
+        torch.nn.init.kaiming_uniform_(weight[trainable_weight_idx])
+        self.weight = torch.nn.Parameter(weight)
+        # print(weight.shape)
+        learnable_mask = torch.zeros(weight.shape[0])
+        # print(learnable_mask.shape)
+        learnable_mask[trainable_weight_idx] = 1
+        learnable_mask = learnable_mask.unsqueeze(1)
+        self.register_buffer('learnable_mask', learnable_mask)
+
+    def forward(self, inp):
+        def zero_grad_fixed(gr):
+            return gr * self.learnable_mask
+
+        self.weight.register_hook(zero_grad_fixed)
         return torch.nn.functional.embedding(
             inp, self.weight, None, None, 2.0, False, False)

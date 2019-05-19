@@ -10,5 +10,5 @@
 from .base_data_loader import *
 from .squad import *
 from .dureader import *
-from .dureader_plus import *
+from .dureader_plus import DuReaderPlus
 

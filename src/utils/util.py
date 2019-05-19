@@ -21,8 +21,6 @@ import torch
 # def tokenizer(text):
 #     return [tok.text for tok in spacy_en.tokenizer(text.strip())]
 
-INF = 1e30  # 定义正无穷
-
 
 def CN_tokenizer(text):
     return list(jieba.cut(text))
@@ -100,22 +98,6 @@ def split_list(alist, word):
     return res
 
 
-def pad_list(A, pad=0):
-    """
-    pad list to max_len.
-    :param A: shape size is 2.
-    :param pad:
-    :return:
-    """
-    max_len = max([len(a) for a in A])
-    res = []
-    for a in A:
-        if len(a) < max_len:
-            a = a + [pad] * (max_len-len(a))
-        res.append(a)
-    return res
-
-
 def seq_mask(seq_len, device, max_len=None):
     '''
     :param seq_len: [b]
@@ -133,6 +115,23 @@ def seq_mask(seq_len, device, max_len=None):
     return mask
 
 
+def softmax_mask(A, mask, dim=1, epsilon=1e-12):
+    '''
+        applay oftmax on A and consider mask
+        :param A:
+        :param mask:
+        :param dim:
+        :param epsilon:
+        :return:
+        '''
+    # According to https://discuss.pytorch.org/t/apply-mask-softmax/14212/7
+    A_max = torch.max(A, dim=dim, keepdim=True)[0]
+    A_exp = torch.exp(A - A_max)
+    A_exp = A_exp * mask  # this step masks
+    A_softmax = A_exp / (torch.sum(A_exp, dim=dim, keepdim=True) + epsilon)
+    return A_softmax
+
+
 def log_softmax_mask(A, mask, dim=1, epsilon=1e-12):
     '''
     applay log_softmax on A and consider mask
@@ -143,11 +142,7 @@ def log_softmax_mask(A, mask, dim=1, epsilon=1e-12):
     :return:
     '''
     # According to https://discuss.pytorch.org/t/apply-mask-softmax/14212/7
-    A_max = torch.max(A, dim=dim, keepdim=True)[0]
-    A_exp = torch.exp(A - A_max)
-    A_exp = A_exp * mask  # this step masks
-    A_log_softmax = torch.log(A_exp / (torch.sum(A_exp, dim=dim, keepdim=True) + epsilon))
-    return A_log_softmax
+    return torch.log(softmax_mask(A, mask, dim=1, epsilon=epsilon))
 
 
 def repeat_tensor(tensor, dim=0, times=2):
@@ -183,6 +178,22 @@ def repeat_tensor(tensor, dim=0, times=2):
     return torch.cat(res, dim=dim)
 
 
+def pad_list(A, pad=0):
+    """
+    pad list to max_len.
+    :param A: shape size is 2.
+    :param pad:
+    :return:
+    """
+    max_len = max([len(a) for a in A])
+    res = []
+    for a in A:
+        if len(a) < max_len:
+            a = a + [pad] * (max_len-len(a))
+        res.append(a)
+    return res
+
+
 def check_scores(scores):
     """make sure not all scores are zero. (True)
     :param scores:
@@ -197,27 +208,19 @@ def check_scores(scores):
 
 
 if __name__ == "__main__":
-    # text = "I like playing computer games."
-    # sent = "I want to watch tv in living room"
-    # text2 = "网站赌博输钱报警有吗"
-    # print(CN_tokenizer(text2))
-    # # print(tokenizer(sent))
-    #
-    # a = ["a", "<sep>", "b", "c", "<sep>", "hjlo", "Hi", "<sep>"]
-    # res = split_list(a, "<sep>")
-    #
-    # a = torch.rand(3, 5, 7)
-    # print("a: ")
-    # print(a)
-    # res = repeat_tensor(a, 0, 3)
-    # print("res: ")
-    # print(res)
+    text = "I like playing computer games."
+    sent = "I want to watch tv in living room"
+    text2 = "网站赌博输钱报警有吗"
+    print(CN_tokenizer(text2))
+    # print(tokenizer(sent))
 
-    A = [
-        [1, 2],
-        [3, 5, 6],
-        [3, 2, 5, 6]
-    ]
-    print(pad_list(A))
+    a = ["a", "<sep>", "b", "c", "<sep>", "hjlo", "Hi", "<sep>"]
+    res = split_list(a, "<sep>")
 
+    a = torch.rand(3, 5, 7)
+    print("a: ")
+    print(a)
+    res = repeat_tensor(a, 0, 3)
+    print("res: ")
+    print(res)
 
