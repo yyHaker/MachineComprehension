@@ -1,7 +1,7 @@
 # MRC2019
 - [2019百度机器阅读理解(Machine Reading Comprehension)](http://lic2019.ccf.org.cn/read)
 - 参赛模型: BiDAF
-- 最终排名: 
+- 最终排名: Top10
 
 ## Develop Requirements
 - OS: Ubuntu 16.04 LTS (64bit)
@@ -30,6 +30,9 @@ BiDAF+pretrain_w2v+PR+yes_no | process_3para | 52.42 | |42.72| |  50.41 | 45.16 
 BiDAF+pretrain_w2v+PR+yes_no(ensemble small) | process_3para |  | | | | 50.78  | 44.53 |
 BiDAF+pretrain_w2v+PR+yes_no(ensemble large) | process_3para |  | | | | 51.53  | 45.58 |
 R-net(too slow) |  |  | | | |   |  |
+
+## 最终leaderBoard
+![avatar](/files/leader.png)
 
 
 ## competition process

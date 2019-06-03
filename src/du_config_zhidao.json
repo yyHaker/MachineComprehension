@@ -1,0 +1,57 @@
+{
+    "name": "three_para_one_answer",
+    "n_gpu": 1,
+     "data_loader": {
+        "type": "DuReaderPlus",
+        "args":{
+            "data_path": "data/dureader/process/2019/v2.0",
+            "process_info": "three_para_multi_answers_filter",
+            "train_file": "zhidao.train.json",
+            "dev_file": "zhidao.dev.json",
+            "test_file": "zhidao.test1.json",
+            "train_batch_size":48,
+            "dev_batch_size":16,
+            "context_threshold": 500,
+            "pretrain_emd_file": "train_on_zhidao.128.w2v.filter",
+            "device": "cuda"
+        }
+    },
+    "arch": {
+        "type": "BiDAFMultiParas",
+        "args": {
+            "char_dim": 8,
+            "char_channel_width": 3,
+            "char_channel_size": 100,
+            "word_dim": 128,
+            "context_threshold": 500,
+            "hidden_size": 128,
+            "dropout": 0.2
+        }
+    },
+    "optimizer": {
+        "type": "Adam",
+        "args":{
+            "lr": 0.001,
+            "weight_decay": 1e-4
+        }
+    },
+    "loss": {
+        "type":"cross_entropy_batch",
+        "lamda": 0.5
+    },
+    "metrics": "ACC",
+    "trainer": {
+        "epochs": 30,
+        "save_dir": "./result/dureader/saved/zhidao",
+        "save_freq": 10,
+        "verbosity": 2,
+        "monitor": "ROUGE-L",
+        "monitor_mode": "max",
+        "result_file": "./result/predict/result.json",
+        "prediction_file": "./result/predict/prediction.json",
+        "log_step": 200
+    },
+    "visualization": {
+        "log_dir": "logs"
+    }
+}
