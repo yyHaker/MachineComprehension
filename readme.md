@@ -1,5 +1,7 @@
 # MRC2019
 - [2019百度机器阅读理解(Machine Reading Comprehension)](http://lic2019.ccf.org.cn/read)
+- 战队名称：yyhaker
+- 队员：[yyHaker](https://github.com/yyHaker) [MrTuo](https://github.com/MrTuo)
 - 参赛模型: BiDAF
 - 最终排名: Top10
 
